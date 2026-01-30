@@ -1,0 +1,18 @@
+# --- Entorno Virtual ---
+# No queremos subir las librerías instaladas, cada uno debe tener las suyas
+venv/
+venv_rasa/
+ENV/
+
+# --- Archivos de Rasa ---
+# Los modelos entrenados son archivos pesados (.tar.gz) y cambian siempre
+models/
+# Carpeta temporal de entrenamiento de Rasa
+.rasa/
+
+# --- Archivos de Sistema y PyCharm ---
+.idea/
+.vscode/
+__pycache__/
+*.py[cod]
+.DS_Store
