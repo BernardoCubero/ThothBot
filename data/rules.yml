@@ -2,12 +2,17 @@ version: "3.1"
 
 rules:
 
-- rule: Say goodbye anytime the user says goodbye
+- rule: responder saludo
   steps:
-  - intent: goodbye
-  - action: utter_goodbye
+  - intent: saludo
+  - action: utter_saludo
 
-- rule: Say 'I am a bot' anytime the user challenges
+- rule: responder despedida
   steps:
-  - intent: bot_challenge
-  - action: utter_iamabot
+  - intent: despedida
+  - action: utter_despedida
+
+- rule: buscarm monumento
+  steps:
+      - intent: buscar_monumentos
+      - action: action_buscar:monumentos

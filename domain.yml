@@ -1,34 +1,69 @@
 version: "3.1"
 
+# Intenciones
 intents:
-  - greet
-  - goodbye
-  - affirm
-  - deny
-  - mood_great
-  - mood_unhappy
-  - bot_challenge
+  - saludo
+  - despedida
+  - buscar_monumentos
+  - info_monumento
+  - buscar_eventos
+  - consultar_entradas
+  - planificar_viaje
+  - recomendar_planes
+
+# Datos Frases
+
+entites:
+  - ciudad
+  - monumento
+  - evento
+  - fecha
+
+#Contexto
+
+slots:
+  ciudad:
+    type: text
+    mappings:
+      - type: from_entity
+        entity: ciudad
+  monumento:
+    type: text
+    mappings:
+      - type: from_entity
+        entity: monumento
+  fecha:
+    type: text
+    mappings:
+      - type: from_entity
+        entity: fecha
+
+
 
 responses:
-  utter_greet:
-  - text: "Hey! How are you?"
+  utter_saludo:
+    - text: "Hola, soy Thothbot, Puedo ayudarte a descrubrir monumentos, eventos y actividades en la Ciudad que tu Elijas"
 
-  utter_cheer_up:
-  - text: "Here is something to cheer you up:"
-    image: "https://i.imgur.com/nGF1K8f.jpg"
+  utter_saludo_en:
+    - text: "Hello, I'm Thothbot. I can help you discover monuments, events and activities in many cities."
 
-  utter_did_that_help:
-  - text: "Did that help you?"
+  utter_despedida:
+    - text: "¡Que tengas un buen viaje!"
 
-  utter_happy:
-  - text: "Great, carry on!"
+  utter_pedir_ciudad:
+    - text: "¿En qué ciudad estás interesado?"
 
-  utter_goodbye:
-  - text: "Bye"
 
-  utter_iamabot:
-  - text: "I am a bot, powered by Rasa."
+#Acciones que usaran las Apis
+
+actions:
+
+  - action_buscar_monumentos
+  - action_info_monumento
+  - action_buscar_eventos
+  - action_consultar_entradas
+  - action_recomendar_planes
 
 session_config:
   session_expiration_time: 60
-  carry_over_slots_to_new_session: true
+  carry_over_slots_to_new_session: false

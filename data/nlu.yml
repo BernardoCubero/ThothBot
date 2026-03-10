@@ -1,24 +1,76 @@
 version: "3.1"
 
 nlu:
-- intent: greet
+- intent: saludo
   examples: |
-    - hey
+    - hola [nombre](saludar)
     - hello
     - hi
-    - hello there
-    - good morning
+    - buenas
+    - buenas tardes
+    - buenas noches 
     - good evening
-    - moin
-    - hey there
-    - let's go
-    - hey dude
     - goodmorning
     - goodevening
     - good afternoon
+    - good morning
+    - good night
 
-- intent: goodbye
+- intent: buscar_monumentos
   examples: |
+    - que ver en [Cordoba](ciudad)
+    - monumentos en [Granada](ciudad)
+    - que puedo visitar en [Madrid](ciudad)
+    - what can I see in [Malaga](ciudad)
+    - monuments in [Granada](ciudad)
+    - what can I visit in [Madrid](ciudad)
+
+- intent: info_monumento
+  examples: |
+    - informacion sobre [la Alhambra](monumento)
+    - hablame de [la Mezquita Catedral](monumento)
+    - qué es [el Prado](monumento)
+    - tell me about [the Alhambra](monumento)
+    - information about [Sagrada Familia](monumento)
+
+
+- intent: buscar_eventos
+  examples: |
+    - hay eventos en [Madrid](ciudad)
+    - conciertos en [Sevilla](ciudad)
+    - eventos hoy en [Granada](ciudad)
+    - events in [Madrid](ciudad)
+    - shows in [Barcelona](ciudad)
+    - concerts in [Seville](ciudad)
+   
+- intent: consultar_entradas
+  examples: |
+    - hay entradas para eventos en [Madrid](ciudad)
+    - entradas para teatro en [Sevilla](ciudad)
+    - tickets for shows in [Barcelona](ciudad)
+    - are there tickets in [Madrid](ciudad)
+    
+- intent: planificar_viaje
+  examples: |
+    - quiero viajar a [Granada](ciudad)
+    - estoy planeando un viaje a [Sevilla](ciudad)
+    - quiero visitar [Barcelona](ciudad)
+    - I want to travel to [Madrid](ciudad)
+    - planning a trip to [Seville](ciudad)
+
+- intent: recomendar_planes
+  examples: |
+    - qué me recomiendas en [Madrid](ciudad)
+    - recomiéndame algo en [Sevilla](ciudad)
+    - what do you recommend in [Barcelona](ciudad)
+    - things to do in [Granada](ciudad)
+    
+
+- intent: despedida
+  examples: |
+    - adios
+    - hasta luego
+    - nos vemos
     - cu
     - good by
     - cee you later
