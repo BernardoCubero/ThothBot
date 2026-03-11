@@ -13,7 +13,7 @@ intents:
 
 # Datos Frases
 
-entites:
+entities:
   - ciudad
   - monumento
   - evento

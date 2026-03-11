@@ -12,7 +12,7 @@ rules:
   - intent: despedida
   - action: utter_despedida
 
-- rule: buscarm monumento
+- rule: buscar monumento
   steps:
       - intent: buscar_monumentos
-      - action: action_buscar:monumentos
+      - action: action_buscar_monumentos
