@@ -2,17 +2,32 @@ version: "3.1"
 
 rules:
 
-- rule: responder saludo
-  steps:
-  - intent: saludo
-  - action: utter_saludo
+  - rule: responder saludo
+    steps:
+      - intent: saludo
+      - action: utter_saludo
 
-- rule: responder despedida
-  steps:
-  - intent: despedida
-  - action: utter_despedida
+  - rule: responder despedida
+    steps:
+      - intent: despedida
+      - action: utter_despedida
 
-- rule: buscar monumento
-  steps:
+  - rule: buscar monumento
+    steps:
       - intent: buscar_monumentos
       - action: action_buscar_monumentos
+
+  - rule: buscar eventos
+    steps:
+      - intent: buscar_eventos
+      - action: action_buscar_eventos
+
+  - rule: ionformacion monumento
+    steps:
+      - intent: info_monumento
+      - action: action_info_monumento
+
+  - rule: recomendar planes
+    steps:
+      - intent: recomendar_planes
+      - action: action_recomendar_planes

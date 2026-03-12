@@ -3,7 +3,7 @@ version: "3.1"
 nlu:
 - intent: saludo
   examples: |
-    - hola [nombre](saludar)
+    - hola [Carlos](nombre)
     - hello
     - hi
     - buenas
@@ -14,7 +14,7 @@ nlu:
     - goodevening
     - good afternoon
     - good morning
-    - good night
+
 
 - intent: buscar_monumentos
   examples: |
@@ -40,6 +40,7 @@ nlu:
     - conciertos en [Sevilla](ciudad)
     - eventos hoy en [Granada](ciudad)
     - events in [Madrid](ciudad)
+    - que eventos hoy en [Granada](ciudad)
     - shows in [Barcelona](ciudad)
     - concerts in [Seville](ciudad)
    
@@ -64,6 +65,9 @@ nlu:
     - recomiéndame algo en [Sevilla](ciudad)
     - what do you recommend in [Barcelona](ciudad)
     - things to do in [Granada](ciudad)
+    - que puedo hacer en [Sevilla](ciudad)
+    - que me recomiendas en [Granada](ciudad)
+    - cosas que hacer en [Granada](ciudad)
     
 
 - intent: despedida
