@@ -21,6 +21,10 @@ nlu:
     - que ver en [Cordoba](ciudad)
     - monumentos en [Granada](ciudad)
     - que puedo visitar en [Madrid](ciudad)
+    - lugares que visitar en [Malaga](ciudad)
+    - que hay para ver en [Cordoba](ciudad)
+    - que puedo hacer en [Granada](ciudad)
+    - que hay en [Sevilla](ciudad)
     - what can I see in [Malaga](ciudad)
     - monuments in [Granada](ciudad)
     - what can I visit in [Madrid](ciudad)
@@ -68,6 +72,13 @@ nlu:
     - que puedo hacer en [Sevilla](ciudad)
     - que me recomiendas en [Granada](ciudad)
     - cosas que hacer en [Granada](ciudad)
+    
+- intent: consultar_ciudad
+  examples: |
+    - que hay en [Cordoba](ciudad)
+    - que puedo hacer en [Sevilla](ciudad)
+    - cosas que hacer en [Granada](ciudad)
+    - what can I do in [Malaga](ciudad)
     
 
 - intent: despedida
