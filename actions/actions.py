@@ -1,5 +1,5 @@
 import unicodedata
-
+from mongo_logger import guardar_log
 from rasa_sdk import Action
 from rasa_sdk.executor import CollectingDispatcher
 
@@ -59,6 +59,11 @@ class ActionBuscarMonumentos(Action):
     def run(self, dispatcher, tracker, domain):
 
         ciudad = tracker.get_slot("ciudad")
+
+        mensaje = tracker.latest_message.get("text")
+        intent = tracker.latest_message.get["intent"].get("name")
+        ciudad = tracker.get_slot("ciudad")
+        guardar_log(intent, ciudad, mensaje)
 
         if ciudad:
             ciudad = ciudadNormalizada(ciudad)
