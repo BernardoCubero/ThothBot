@@ -12,22 +12,8 @@ rules:
       - intent: despedida
       - action: utter_despedida
 
-  - rule: buscar monumento
+
+  - rule: ciudad sola devuelve monumentos
     steps:
-      - intent: buscar_monumentos
+      - intent: consultar_ciudad
       - action: action_buscar_monumentos
-
-  - rule: buscar eventos
-    steps:
-      - intent: buscar_eventos
-      - action: action_buscar_eventos
-
-  - rule: ionformacion monumento
-    steps:
-      - intent: info_monumento
-      - action: action_info_monumento
-
-  - rule: recomendar planes
-    steps:
-      - intent: recomendar_planes
-      - action: action_recomendar_planes

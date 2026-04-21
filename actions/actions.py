@@ -1,7 +1,21 @@
 import unicodedata
-from mongo_logger import guardar_log
+from actions.db.mongo_logger import guardar_log
 from rasa_sdk import Action
-from rasa_sdk.executor import CollectingDispatcher
+from difflib import get_close_matches
+from dotenv import load_dotenv
+import os
+import requests
+import urllib.parse
+
+# Gestion de Claves Api
+load_dotenv()
+API_KEY = os.getenv("GEOAPIFY_API_KEY")
+
+alias_monumentos = {
+    "mezquita": "Mezquita_Catedral_de_Córdoba",
+    "alhambra": "Alhambra",
+    "puente romano": "Puente_Romano_de_Córdoba"
+}
 
 monumentos = {
     "cordoba": [
@@ -61,29 +75,62 @@ class ActionBuscarMonumentos(Action):
         ciudad = tracker.get_slot("ciudad")
 
         mensaje = tracker.latest_message.get("text")
-        intent = tracker.latest_message.get["intent"].get("name")
-        ciudad = tracker.get_slot("ciudad")
+        intent = tracker.latest_message.get("intent").get("name")
         guardar_log(intent, ciudad, mensaje)
 
-        if ciudad:
-            ciudad = ciudadNormalizada(ciudad)
-
-            if ciudad in monumentos:
-
-                lista = monumentos[ciudad]
-
-                respuesta = f"En {ciudad.capitalize()} puedes visitar:\n"
-
-                for m in lista:
-                    respuesta += f"- {m}\n"
-
-                dispatcher.utter_message(text=respuesta)
-
-            else:
-                dispatcher.utter_message(text=f"No tengo información de {ciudad} todavía.")
-
-        else:
+        if not ciudad:
             dispatcher.utter_message(text="¿En qué ciudad quieres buscar monumentos?")
+            return []
+
+        ciudad_norm = ciudadNormalizada(ciudad)
+
+        # Coordenadas básicas (luego lo mejoramos con geocoding)
+        coords = {
+            "cordoba": (37.8882, -4.7794),
+            "sevilla": (37.3891, -5.9845),
+            "granada": (37.1773, -3.5986)
+        }
+
+        if ciudad_norm not in coords:
+            dispatcher.utter_message(text=f"No tengo coordenadas para {ciudad}.")
+            return []
+
+        lat, lon = coords[ciudad_norm]
+
+        url = "https://api.geoapify.com/v2/places"
+
+        params = {
+            "categories": "tourism.sights",
+            "filter": f"circle:{lon},{lat},2000",
+            "limit": 5,
+            "apiKey": API_KEY
+        }
+
+        response = requests.get(url, params=params)
+        
+        try:
+            response = requests.get(url, params=params)
+            data = response.json()
+
+            lugares = []
+
+            for lugar in data.get("features", []):
+                nombre = lugar["properties"].get("name")
+                if nombre:
+                    lugares.append(nombre)
+
+            if lugares:
+                respuesta = f"Estos son algunos lugares interesantes en {ciudad.capitalize()}:\n"
+                for l in lugares:
+                    respuesta += f"- {l}\n"
+            else:
+                respuesta = f"No encontré monumentos en {ciudad}."
+
+            dispatcher.utter_message(text=respuesta)
+
+        except Exception as e:
+            dispatcher.utter_message(text="Hubo un problema al consultar los monumentos.")
+            print(e)
 
         return []
 
@@ -106,7 +153,19 @@ class ActionBuscarEventos(Action):
 
             if ciudad in eventos:
 
+                mensaje = tracker.latest_message.get("text").lower()
+
                 lista = eventos[ciudad]
+
+                # Filtrado por tipo
+                if "teatro" in mensaje:
+                    lista = [e for e in lista if "teatro" in e.lower()]
+
+                elif "concierto" in mensaje:
+                    lista = [e for e in lista if "concierto" in e.lower()]
+
+                elif "festival" in mensaje:
+                    lista = [e for e in lista if "festival" in e.lower()]
 
                 respuesta = f"En {ciudad.capitalize()} puedes asistir a:\n"
 
@@ -152,20 +211,54 @@ class ActionInfoMonumento(Action):
 
     def run(self, dispatcher, tracker, domain):
 
+        mensaje = tracker.latest_message.get("text").lower()
+
+        # Detectar si es un evento
+        if "festival" in mensaje or "concierto" in mensaje or "teatro" in mensaje:
+            dispatcher.utter_message(text="Eso parece un evento. Puedes preguntarme por eventos en una ciudad.")
+            return []
+
         monumento = tracker.get_slot("monumento")
 
         if monumento:
 
-            monumento = monumento.lower()
+            monumento = ciudadNormalizada(monumento)
 
-            if monumento in info_monumentos:
-
-                respuesta = info_monumentos[monumento]
-
-                dispatcher.utter_message(text=respuesta)
-
+            if monumento in alias_monumentos:
+                monumento_api = alias_monumentos[monumento]
             else:
-                dispatcher.utter_message(text="No tengo información sobre ese monumento todavía.")
+                monumento_api = monumento.replace(" ", "_")
+
+            monumento_api_encoded = urllib.parse.quote(monumento_api)
+
+            url = f"https://es.wikipedia.org/api/rest_v1/page/summary/{monumento_api_encoded}"
+
+            try:
+                headers = {
+                    "User-Agent": "ThothBot/1.0 (proyecto TFG)"
+                }
+
+                response = requests.get(url, headers=headers)
+
+                print("STATUS:", response.status_code)
+                print("URL:", url)
+
+                if response.status_code == 200:
+                    data = response.json()
+
+                    if "extract" in data:
+                        respuesta = data["extract"]
+                    else:
+                        respuesta = "No encontré información sobre ese monumento."
+
+                else:
+                    respuesta = f"Error en Wikipedia: {response.status_code}"
+
+            except Exception as e:
+                respuesta = "Hubo un problema al consultar la información."
+                print("ERROR:", e)
+
+            dispatcher.utter_message(text=respuesta)
 
         else:
             dispatcher.utter_message(text="¿Sobre qué monumento quieres información?")

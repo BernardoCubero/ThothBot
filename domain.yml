@@ -8,8 +8,8 @@ intents:
   - info_monumento
   - buscar_eventos
   - consultar_entradas
-  - planificar_viaje
   - recomendar_planes
+  - consultar_ciudad
 
 # Datos Frases
 
