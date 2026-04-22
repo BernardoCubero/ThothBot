@@ -2,17 +2,12 @@ version: "3.1"
 
 stories:
 
-- story: buscar monumentos
+- story: buscar monumentos completo
   steps:
     - intent: buscar_monumentos
     - action: action_buscar_monumentos
 
-- story: info monumento
-  steps:
-    - intent: info_monumento
-    - action: action_info_monumento
-
-- story: buscar eventos
+- story: buscar eventos completo
   steps:
     - intent: buscar_eventos
     - action: action_buscar_eventos
@@ -21,38 +16,3 @@ stories:
   steps:
     - intent: recomendar_planes
     - action: action_recomendar_planes
-
-- story: buscar y luego pedir info
-  steps:
-    - intent: buscar_monumentos
-    - action: action_buscar_monumentos
-    - intent: info_monumento
-
-- story: buscar y luego recomendar
-  steps:
-    - intent: buscar_monumentos
-    - action: action_buscar_monumentos
-    - intent: recomendar_planes
-    - action: action_recomendar_planes
-
-- story: saludo inicial
-  steps:
-    - intent: saludo
-    - action: utter_saludo
-
-- story: despedida
-  steps:
-    - intent: despedida
-    - action: utter_despedida
-
-- story: usuario dice ciudad despues
-  steps:
-    - intent: saludo
-    - action: utter_saludo
-    - intent: buscar_monumentos
-    - action: action_buscar_monumentos
-
-- story: usuario dice ciudad → mostrar monumentos
-  steps:
-    - intent: consultar_ciudad
-    - action: action_buscar_monumentos

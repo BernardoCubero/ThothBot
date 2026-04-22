@@ -1,6 +1,8 @@
 import unicodedata
+from rasa.shared.core.events import FollowupAction
 from actions.db.mongo_logger import guardar_log
 from rasa_sdk import Action
+from rasa_sdk.events import SlotSet
 from difflib import get_close_matches
 from dotenv import load_dotenv
 import os
@@ -14,55 +16,168 @@ API_KEY = os.getenv("GEOAPIFY_API_KEY")
 alias_monumentos = {
     "mezquita": "Mezquita_Catedral_de_Córdoba",
     "alhambra": "Alhambra",
-    "puente romano": "Puente_Romano_de_Córdoba"
+    "puente romano": "Puente_Romano_de_Córdoba",
 }
 
 monumentos = {
     "cordoba": [
         "Mezquita de Córdoba",
         "Puente Romano",
-        "Alcázar de los Reyes Cristianos"
+        "Alcázar de los Reyes Cristianos",
     ]
 }
 recomendaciones = {
     "cordoba": [
         "Visitar la Mezquita de Córdoba",
         "Pasear por la Judería",
-        "Ver el Puente Romano al atardecer"
+        "Ver el Puente Romano al atardecer",
     ],
     "granada": [
         "Visitar la Alhambra",
         "Pasear por el Albaicín",
-        "Ver el Mirador de San Nicolás"
+        "Ver el Mirador de San Nicolás",
     ],
     "sevilla": [
         "Visitar la Plaza de España",
         "Entrar en el Real Alcázar",
-        "Pasear por el barrio de Triana"
-    ]
+        "Pasear por el barrio de Triana",
+    ],
 }
 eventos = {
     "cordoba": [
         "Festival flamenco",
         "Concierto en el centro",
-        "Teatro en el Gran Teatro"
+        "Teatro en el Gran Teatro",
     ]
 }
 info_monumentos = {
     "alhambra": "La Alhambra es un complejo palaciego y fortaleza situado en Granada, construido durante el reino nazarí.",
     "mezquita de córdoba": "La Mezquita-Catedral de Córdoba es uno de los monumentos más importantes del arte islámico en España.",
-    "puente romano": "El Puente Romano de Córdoba cruza el río Guadalquivir y fue construido durante la época romana."
+    "puente romano": "El Puente Romano de Córdoba cruza el río Guadalquivir y fue construido durante la época romana.",
 }
+
+
+def obtener_coords(ciudad):
+    url = "https://api.geoapify.com/v1/geocode/search"
+
+    params = {"text": ciudad + ", Spain", "limit": 1, "apiKey": API_KEY}
+
+    response = requests.get(url, params=params)
+    data = response.json()
+
+    if data.get("features"):
+        coords = data["features"][0]["geometry"]["coordinates"]
+        lon, lat = coords
+        return lat, lon
+
+    return None, None
 
 
 def ciudadNormalizada(texto):
     texto = texto.lower()
     texto = texto.strip()
-    texto = ''.join(
-        c for c in unicodedata.normalize('NFD', texto)
-        if unicodedata.category(c) != 'Mn'
+    texto = "".join(
+        c
+        for c in unicodedata.normalize("NFD", texto)
+        if unicodedata.category(c) != "Mn"
     )
     return texto
+
+
+def extraer_ciudad_del_mensaje(tracker):
+    # Prioriza entidad ciudad del ultimo mensaje para permitir cambiar de ciudad.
+    entities = tracker.latest_message.get("entities") or []
+    for entidad in entities:
+        if entidad.get("entity") == "ciudad" and entidad.get("value"):
+            return entidad.get("value")
+
+    # Si el intent es solo ciudad, usar el texto completo como nuevo valor.
+    intent = (tracker.latest_message.get("intent") or {}).get("name")
+    texto = (tracker.latest_message.get("text") or "").strip()
+    if intent == "consultar_ciudad" and texto:
+        return texto
+
+    return None
+
+
+def buscar_en_wikipedia(monumento):
+    url = "https://es.wikipedia.org/w/api.php"
+    # CAMBIO: Wikipedia exige User-Agent en la API de busqueda (evita 403).
+    headers = {"User-Agent": "ThothBot/1.0 (proyecto TFG)"}
+
+    params = {
+        "action": "query",
+        "list": "search",
+        "srsearch": monumento,
+        "format": "json",
+        "srlimit": 1,
+    }
+
+    # CAMBIO: peticion robusta con timeout y control de errores de red.
+    try:
+        response = requests.get(url, params=params, headers=headers, timeout=12)
+    except requests.RequestException as e:
+        print("ERROR Wikipedia search:", e)
+        return None
+
+    if response.status_code != 200:
+        return None
+
+    # CAMBIO: proteger parseo JSON para no romper la accion con respuestas invalidas.
+    try:
+        data = response.json()
+    except ValueError:
+        return None
+
+    resultados = data.get("query", {}).get("search", [])
+
+    if resultados:
+        titulo = resultados[0]["title"]
+        return titulo  # Ej: "Mezquita-Catedral de Córdoba"
+
+    return None
+
+
+def obtener_resumen_wikipedia(titulo):
+    titulo_encoded = urllib.parse.quote(titulo.replace(" ", "_"))
+    url = f"https://es.wikipedia.org/api/rest_v1/page/summary/{titulo_encoded}"
+
+    # CAMBIO: mantener User-Agent tambien en endpoint REST de resumen.
+    headers = {"User-Agent": "ThothBot/1.0 (proyecto TFG)"}
+
+    try:
+        response = requests.get(url, headers=headers)
+
+        if response.status_code != 200 or not response.text:
+            return None
+
+        data = response.json()
+
+        descripcion = data.get("description", "")
+        extract = data.get("extract", "")
+        link = data.get("content_urls", {}).get("desktop", {}).get("page", "")
+
+        # Recortar extract a máximo 3 frases
+        frases = extract.split(". ")
+        resumen_corto = ". ".join(frases[:3]).strip()
+        if resumen_corto and not resumen_corto.endswith("."):
+            resumen_corto += "."
+
+        if not resumen_corto:
+            return None
+
+        resultado = f" *{titulo}*"
+        if descripcion:
+            resultado += f"\n_{descripcion}_"
+        resultado += f"\n\n{resumen_corto}"
+        if link:
+            resultado += f"\n\n🔗 Más info: {link}"
+
+        return resultado
+
+    except Exception as e:
+        print("ERROR Wikipedia summary:", e)
+        return None
 
 
 class ActionBuscarMonumentos(Action):
@@ -72,42 +187,70 @@ class ActionBuscarMonumentos(Action):
 
     def run(self, dispatcher, tracker, domain):
 
+        mensaje = tracker.latest_message.get("text").lower()
+
+        #  detectar si es monumento
+        if any(
+            palabra in mensaje
+            for palabra in [
+                " de ",
+                " del ",
+                "palacio",
+                "convento",
+                "catedral",
+                "iglesia",
+                "monasterio",
+                "castillo",
+            ]
+        ):
+            dispatcher.utter_message(
+                text="Eso parece un monumento. Voy a darte información."
+            )
+            return [FollowupAction("action_info_monumento")]
+
         ciudad = tracker.get_slot("ciudad")
+        ciudad_mensaje = extraer_ciudad_del_mensaje(tracker)
+        if ciudad_mensaje:
+            ciudad = ciudad_mensaje
 
-        mensaje = tracker.latest_message.get("text")
-        intent = tracker.latest_message.get("intent").get("name")
-        guardar_log(intent, ciudad, mensaje)
+        # luego fallback
+        if not ciudad:
+            texto = tracker.latest_message.get("text")
+            palabras = texto.split()
 
+            if palabras:
+                ciudad = palabras[-1]
+
+        # Revitar fallo si Mongo no funciona
+        try:
+            mensaje = tracker.latest_message.get("text")
+            intent = tracker.latest_message.get("intent").get("name")
+            guardar_log(intent, ciudad, mensaje)
+        except Exception as e:
+            print("Error log:", e)
+
+        #  si no hay ciudad
         if not ciudad:
             dispatcher.utter_message(text="¿En qué ciudad quieres buscar monumentos?")
             return []
 
-        ciudad_norm = ciudadNormalizada(ciudad)
+        #  obtener coordenadas dinámicamente
+        lat, lon = obtener_coords(ciudad)
 
-        # Coordenadas básicas (luego lo mejoramos con geocoding)
-        coords = {
-            "cordoba": (37.8882, -4.7794),
-            "sevilla": (37.3891, -5.9845),
-            "granada": (37.1773, -3.5986)
-        }
-
-        if ciudad_norm not in coords:
-            dispatcher.utter_message(text=f"No tengo coordenadas para {ciudad}.")
+        if not lat or not lon:
+            dispatcher.utter_message(text=f"No encontré la ciudad {ciudad}.")
             return []
 
-        lat, lon = coords[ciudad_norm]
-
+        # llamada a Geoapify
         url = "https://api.geoapify.com/v2/places"
 
         params = {
             "categories": "tourism.sights",
-            "filter": f"circle:{lon},{lat},2000",
-            "limit": 5,
-            "apiKey": API_KEY
+            "filter": f"circle:{lon},{lat},5000",
+            "limit": 10,
+            "apiKey": API_KEY,
         }
 
-        response = requests.get(url, params=params)
-        
         try:
             response = requests.get(url, params=params)
             data = response.json()
@@ -120,7 +263,7 @@ class ActionBuscarMonumentos(Action):
                     lugares.append(nombre)
 
             if lugares:
-                respuesta = f"Estos son algunos lugares interesantes en {ciudad.capitalize()}:\n"
+                respuesta = f"En {ciudad.capitalize()} puedes visitar:\n"
                 for l in lugares:
                     respuesta += f"- {l}\n"
             else:
@@ -129,10 +272,12 @@ class ActionBuscarMonumentos(Action):
             dispatcher.utter_message(text=respuesta)
 
         except Exception as e:
-            dispatcher.utter_message(text="Hubo un problema al consultar los monumentos.")
+            dispatcher.utter_message(
+                text="Hubo un problema al consultar los monumentos."
+            )
             print(e)
 
-        return []
+        return [SlotSet("ciudad", ciudad)]
 
 
 class ActionBuscarEventos(Action):
@@ -143,6 +288,16 @@ class ActionBuscarEventos(Action):
     def run(self, dispatcher, tracker, domain):
 
         ciudad = tracker.get_slot("ciudad")
+        ciudad_mensaje = extraer_ciudad_del_mensaje(tracker)
+        if ciudad_mensaje:
+            ciudad = ciudad_mensaje
+
+        if not ciudad:
+            texto = tracker.latest_message.get("text")
+            palabras = texto.split()
+
+            if palabras:
+                ciudad = palabras[-1]
 
         if not ciudad:
             dispatcher.utter_message(text="¿En que ciudad?")
@@ -180,7 +335,7 @@ class ActionBuscarEventos(Action):
         else:
             dispatcher.utter_message(text="¿En qué ciudad quieres buscar eventos?")
 
-        return []
+        return [SlotSet("ciudad", ciudad)]
 
 
 class ActionRecomendarPlanes(Action):
@@ -188,7 +343,17 @@ class ActionRecomendarPlanes(Action):
         return "action_recomendar_planes"
 
     def run(self, dispatcher, tracker, domain):
+
         ciudad = tracker.get_slot("ciudad")
+        ciudad_mensaje = extraer_ciudad_del_mensaje(tracker)
+        if ciudad_mensaje:
+            ciudad = ciudad_mensaje
+
+        if not ciudad:
+            dispatcher.utter_message(text="¿En que ciudad quieres recomendaciones?")
+            return []
+
+        ciudad = ciudadNormalizada(ciudad)
         if ciudad:
             ciudad = ciudadNormalizada(ciudad)
             if ciudad in recomendaciones:
@@ -198,10 +363,12 @@ class ActionRecomendarPlanes(Action):
                     respuesta += f"- {m}\n"
                 dispatcher.utter_message(text=respuesta)
             else:
-                dispatcher.utter_message(text="Todavia no dispongo de recomendaciones para esa ciudad.")
+                dispatcher.utter_message(
+                    text="Todavia no dispongo de recomendaciones para esa ciudad."
+                )
         else:
             dispatcher.utter_message(text="¿En que ciudad quieres recomendaciones?")
-        return []
+        return [SlotSet("ciudad", ciudad)]
 
 
 class ActionInfoMonumento(Action):
@@ -213,54 +380,60 @@ class ActionInfoMonumento(Action):
 
         mensaje = tracker.latest_message.get("text").lower()
 
-        # Detectar si es un evento
+        # evitar confusión con eventos
         if "festival" in mensaje or "concierto" in mensaje or "teatro" in mensaje:
-            dispatcher.utter_message(text="Eso parece un evento. Puedes preguntarme por eventos en una ciudad.")
+            dispatcher.utter_message(
+                text="Eso parece un evento. Puedes preguntarme por eventos en una ciudad."
+            )
             return []
 
         monumento = tracker.get_slot("monumento")
+        # CAMBIO: se elimino reemplazar " de " para no degradar nombres validos.
+        # Antes: monumento = monumento.replace(" de ", " ")
+        texto = tracker.latest_message.get("text").lower()
 
-        if monumento:
+        # 🔥 reconstrucción inteligente si el slot falla
+        if not monumento or len(monumento) < 3 or monumento == "de":
 
-            monumento = ciudadNormalizada(monumento)
+            stopwords = [
+                "que",
+                "es",
+                "de",
+                "la",
+                "el",
+                "dime",
+                "algo",
+                "sobre",
+                "informacion",
+                "sabes",
+            ]
 
-            if monumento in alias_monumentos:
-                monumento_api = alias_monumentos[monumento]
-            else:
-                monumento_api = monumento.replace(" ", "_")
+            palabras = texto.split()
+            palabras_limpias = [p for p in palabras if p not in stopwords]
 
-            monumento_api_encoded = urllib.parse.quote(monumento_api)
+            if palabras_limpias:
+                monumento = " ".join(palabras_limpias)
 
-            url = f"https://es.wikipedia.org/api/rest_v1/page/summary/{monumento_api_encoded}"
-
-            try:
-                headers = {
-                    "User-Agent": "ThothBot/1.0 (proyecto TFG)"
-                }
-
-                response = requests.get(url, headers=headers)
-
-                print("STATUS:", response.status_code)
-                print("URL:", url)
-
-                if response.status_code == 200:
-                    data = response.json()
-
-                    if "extract" in data:
-                        respuesta = data["extract"]
-                    else:
-                        respuesta = "No encontré información sobre ese monumento."
-
-                else:
-                    respuesta = f"Error en Wikipedia: {response.status_code}"
-
-            except Exception as e:
-                respuesta = "Hubo un problema al consultar la información."
-                print("ERROR:", e)
-
-            dispatcher.utter_message(text=respuesta)
-
-        else:
+        # validación final
+        if not monumento or len(monumento.strip()) < 3:
             dispatcher.utter_message(text="¿Sobre qué monumento quieres información?")
+            return []
 
+        #  normalizar texto
+        monumento = ciudadNormalizada(monumento)
+        for prefijo in ["la ", "el ", "los ", "las "]:
+            if monumento.startswith(prefijo):
+                monumento = monumento[len(prefijo) :]
+        # buscar título en Wikipedia
+        titulo = buscar_en_wikipedia(monumento)
+
+        if not titulo:
+            titulo = monumento
+
+        respuesta = obtener_resumen_wikipedia(titulo)
+
+        if not respuesta:
+            respuesta = f"No encontré información fiable sobre '{monumento}'."
+
+        dispatcher.utter_message(text=respuesta)
         return []

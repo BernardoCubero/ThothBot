@@ -2,18 +2,41 @@ version: "3.1"
 
 rules:
 
-  - rule: responder saludo
-    steps:
-      - intent: saludo
-      - action: utter_saludo
+- rule: saludo
+  steps:
+    - intent: saludo
+    - action: utter_saludo
 
-  - rule: responder despedida
-    steps:
-      - intent: despedida
-      - action: utter_despedida
+- rule: despedida
+  steps:
+    - intent: despedida
+    - action: utter_despedida
 
+# CLAVE: ciudad sola → monumentos
+- rule: ciudad sola devuelve monumentos
+  steps:
+    - intent: consultar_ciudad
+    - action: action_buscar_monumentos
 
-  - rule: ciudad sola devuelve monumentos
-    steps:
-      - intent: consultar_ciudad
-      - action: action_buscar_monumentos
+# usar slot para eventos
+- rule: buscar eventos con o sin ciudad
+  steps:
+    - intent: buscar_eventos
+    - action: action_buscar_eventos
+
+# usar slot para monumentos
+- rule: buscar monumentos con o sin ciudad
+  steps:
+    - intent: buscar_monumentos
+    - action: action_buscar_monumentos
+
+# recomendaciones
+- rule: recomendar planes
+  steps:
+    - intent: recomendar_planes
+    - action: action_recomendar_planes
+
+- rule: info de monumento siempre usa action_info_monumento
+  steps:
+    - intent: info_monumento
+    - action: action_info_monumento

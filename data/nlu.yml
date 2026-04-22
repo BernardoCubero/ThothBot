@@ -9,7 +9,6 @@ nlu:
       - hola que tal
       - buenos dias
       - buenas tardes
-      
       - hello
       - hi
       - hey there
@@ -18,19 +17,14 @@ nlu:
 
   - intent: buscar_monumentos
     examples: |
-              # Español
-              - que ver en [Cordoba](ciudad)
-              - que puedo ver en [Cordoba](ciudad)
-              - que visitar en [Sevilla](ciudad)
-              - monumentos en [Granada](ciudad)
-              - lugares turisticos en [Cordoba](ciudad)
-              - sitios para visitar en [Sevilla](ciudad)
-              - que hay para ver en [Granada](ciudad)
-              - estoy en [Cordoba](ciudad) que puedo ver
-              - voy a viajar a [Sevilla](ciudad) que me recomiendas ver
-              - sitios interesantes en [Granada](ciudad)
-              - hola me dices monumentos en [cordoba](ciudad)
-
+      - que ver en [madrid](ciudad)
+      - que visitar en [madrid](ciudad)
+      - monumentos en [madrid](ciudad)
+      - lugares en [madrid](ciudad)
+      - quiero ver [madrid](ciudad)
+      - stiois en [bilbao](ciudad)
+      - dame informacion sobre[burgos](ciudad)
+      - recomiendame sitios en [valladolid](ciudad)
               # Inglés
               - what to see in [Cordoba](ciudad)
               - what can I visit in [Seville](ciudad)
@@ -45,118 +39,105 @@ nlu:
 
   - intent: info_monumento
     examples: |
-      - informacion sobre [la Alhambra](monumento)
-      - hablame de [la Mezquita Catedral](monumento)
-      - qué es [el Prado](monumento)
-      - tell me about [the Alhambra](monumento)
-      - information about [Sagrada Familia](monumento)
-
-
-  - intent: info_monumento
-    examples: |
-      # Español
-      - dame informacion de la [mezquita](monumento)
-      - que es la [mezquita de cordoba](monumento)
-      - hablame del [puente romano](monumento)
-      - informacion del [alcazar](monumento)
-      - que sabes de la [alhambra](monumento)
-      - explicame que es la [mezquita](monumento)
-      - informacion sobre el [puente romano](monumento)
-      - que es el [alcazar de sevilla](monumento)
-      - detalles de la [alhambra](monumento)
-      - cuentame sobre la [mezquita](monumento)
+      - informacion sobre [templo de debod](monumento)
+      - dime informacion sobre [templo de debod](monumento)
+      - que sabes de [templo de debod](monumento)
+      - dime algo sobre [pozo de la nieve](monumento)
+      - informacion sobre [palacio real](monumento)
+      - que es [casa de las conchas](monumento)
+      - dime algo sobre [mezquita](monumento)
+      - dame informacion sobre [palacio de bracamonte](monumento)
+    
+      - intent: buscar_eventos
+        examples: |
+          # Español
+          - eventos en [Cordoba](ciudad)
+          - que eventos hay en [Sevilla](ciudad)
+          - que hacer en [Granada](ciudad) este finde
+          - conciertos en [Cordoba](ciudad)
+          - actividades en [Sevilla](ciudad)
+          - eventos culturales en [Granada](ciudad)
+          - hay algo que hacer en [Cordoba](ciudad)
+          - que planes hay en [Sevilla](ciudad)
+          - eventos hoy en [Granada](ciudad)
+          - cosas que hacer en [Cordoba](ciudad)
       
-      # Inglés
-      - tell me about the [mosque](monumento)
-      - information about the [mosque of cordoba](monumento)
-      - what is the [roman bridge](monumento)
-      - tell me about the [alhambra](monumento)
-      - information about the [alcazar](monumento)
-      - what is the [mosque of cordoba](monumento)
-      - details about the [roman bridge](monumento)
-      - explain the [alhambra](monumento)
-      - what can you tell me about the [alcazar](monumento)
-      - give me information about the [mosque](monumento)
+          # Inglés
+          - events in [Cordoba](ciudad)
+          - what events are in [Seville](ciudad)
+          - things to do in [Granada](ciudad) this weekend
+          - concerts in [Cordoba](ciudad)
+          - activities in [Seville](ciudad)
+          - cultural events in [Granada](ciudad)
+          - what can I do in [Cordoba](ciudad)
+          - plans in [Seville](ciudad)
+          - events today in [Granada](ciudad)
+          - things happening in [Cordoba](ciudad)
 
-  - intent: buscar_eventos
-    examples: |
-      # Español
-      - eventos en [Cordoba](ciudad)
-      - que eventos hay en [Sevilla](ciudad)
-      - que hacer en [Granada](ciudad) este finde
-      - conciertos en [Cordoba](ciudad)
-      - actividades en [Sevilla](ciudad)
-      - eventos culturales en [Granada](ciudad)
-      - hay algo que hacer en [Cordoba](ciudad)
-      - que planes hay en [Sevilla](ciudad)
-      - eventos hoy en [Granada](ciudad)
-      - cosas que hacer en [Cordoba](ciudad)
+
+      - intent: recomendar_planes
+        examples: |
+          # Español
+          - que me recomiendas en [Cordoba](ciudad)
+          - planes en [Sevilla](ciudad)
+          - que hacer en [Granada](ciudad)
+          - recomiendame algo en [Cordoba](ciudad)
+          - que puedo hacer en [Sevilla](ciudad)
+          - sugerencias en [Granada](ciudad)
+          - dame ideas en [Cordoba](ciudad)
+          - que planes hay en [Sevilla](ciudad)
+          - que me aconsejas en [Granada](ciudad)
+          - ideas para hacer en [Cordoba](ciudad)
       
-      # Inglés
-      - events in [Cordoba](ciudad)
-      - what events are in [Seville](ciudad)
-      - things to do in [Granada](ciudad) this weekend
-      - concerts in [Cordoba](ciudad)
-      - activities in [Seville](ciudad)
-      - cultural events in [Granada](ciudad)
-      - what can I do in [Cordoba](ciudad)
-      - plans in [Seville](ciudad)
-      - events today in [Granada](ciudad)
-      - things happening in [Cordoba](ciudad)
+          # Inglés
+          - what do you recommend in [Cordoba](ciudad)
+          - plans in [Seville](ciudad)
+          - what can I do in [Granada](ciudad)
+          - suggest something in [Cordoba](ciudad)
+          - what should I do in [Seville](ciudad)
+          - recommendations in [Granada](ciudad)
+          - give me ideas in [Cordoba](ciudad)
+          - what plans are there in [Seville](ciudad)
+          - what do you suggest in [Granada](ciudad)
+          - things to do in [Cordoba](ciudad)
 
 
-  - intent: recomendar_planes
-    examples: |
-      # Español
-      - que me recomiendas en [Cordoba](ciudad)
-      - planes en [Sevilla](ciudad)
-      - que hacer en [Granada](ciudad)
-      - recomiendame algo en [Cordoba](ciudad)
-      - que puedo hacer en [Sevilla](ciudad)
-      - sugerencias en [Granada](ciudad)
-      - dame ideas en [Cordoba](ciudad)
-      - que planes hay en [Sevilla](ciudad)
-      - que me aconsejas en [Granada](ciudad)
-      - ideas para hacer en [Cordoba](ciudad)
+      - intent: despedida
+        examples: |
+          - adios
+          - hasta luego
+          - nos vemos
+          - gracias adios
       
-      # Inglés
-      - what do you recommend in [Cordoba](ciudad)
-      - plans in [Seville](ciudad)
-      - what can I do in [Granada](ciudad)
-      - suggest something in [Cordoba](ciudad)
-      - what should I do in [Seville](ciudad)
-      - recommendations in [Granada](ciudad)
-      - give me ideas in [Cordoba](ciudad)
-      - what plans are there in [Seville](ciudad)
-      - what do you suggest in [Granada](ciudad)
-      - things to do in [Cordoba](ciudad)
+          - goodbye
+          - bye
+          - see you
+          - thanks bye
 
+      - intent: bot_challenge
+        examples: |
+          - are you a bot?
+          - are you a human?
+          - am I talking to a bot?
+          - am I talking to a human?
 
-  - intent: despedida
-    examples: |
-      - adios
-      - hasta luego
-      - nos vemos
-      - gracias adios
+      - intent: buscar_eventos
+        examples: |
+          - festival flamenco
+          - concierto
+          - teatro
+          - evento
+          - actividades
+          - cosas que hacer
+          - eventos
       
-      - goodbye
-      - bye
-      - see you
-      - thanks bye
-
-  - intent: bot_challenge
+  - intent: consultar_ciudad
     examples: |
-      - are you a bot?
-      - are you a human?
-      - am I talking to a bot?
-      - am I talking to a human?
-
-  - intent: buscar_eventos
-    examples: |
-      - festival flamenco
-      - concierto
-      - teatro
-      - evento
-      - actividades
-      - cosas que hacer
-      - eventos
+      - madrid
+      - sevilla
+      - granada
+      - valencia
+      - bilbao
+      - burgos
+      - toledo
+      - pedraza
