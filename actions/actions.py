@@ -8,53 +8,21 @@ from dotenv import load_dotenv
 import os
 import requests
 import urllib.parse
+import json
 
 # Gestion de Claves Api
 load_dotenv()
 API_KEY = os.getenv("GEOAPIFY_API_KEY")
+TK_API_KEY = os.getenv("TKMASTER")
 
-alias_monumentos = {
-    "mezquita": "Mezquita_Catedral_de_Córdoba",
-    "alhambra": "Alhambra",
-    "puente romano": "Puente_Romano_de_Córdoba",
-}
+def cargar_i18n():
+    # Separo la carga del json para que quede mas limpio, lo vi en un tutorial de youtube
+    import os
+    ruta = os.path.join(os.path.dirname(__file__), '..', 'data', 'i18n_config.json')
+    with open(ruta, 'r', encoding='utf-8') as f:
+        return json.load(f)
 
-monumentos = {
-    "cordoba": [
-        "Mezquita de Córdoba",
-        "Puente Romano",
-        "Alcázar de los Reyes Cristianos",
-    ]
-}
-recomendaciones = {
-    "cordoba": [
-        "Visitar la Mezquita de Córdoba",
-        "Pasear por la Judería",
-        "Ver el Puente Romano al atardecer",
-    ],
-    "granada": [
-        "Visitar la Alhambra",
-        "Pasear por el Albaicín",
-        "Ver el Mirador de San Nicolás",
-    ],
-    "sevilla": [
-        "Visitar la Plaza de España",
-        "Entrar en el Real Alcázar",
-        "Pasear por el barrio de Triana",
-    ],
-}
-eventos = {
-    "cordoba": [
-        "Festival flamenco",
-        "Concierto en el centro",
-        "Teatro en el Gran Teatro",
-    ]
-}
-info_monumentos = {
-    "alhambra": "La Alhambra es un complejo palaciego y fortaleza situado en Granada, construido durante el reino nazarí.",
-    "mezquita de córdoba": "La Mezquita-Catedral de Córdoba es uno de los monumentos más importantes del arte islámico en España.",
-    "puente romano": "El Puente Romano de Córdoba cruza el río Guadalquivir y fue construido durante la época romana.",
-}
+TEXTOS = cargar_i18n()
 
 
 def obtener_coords(ciudad):
@@ -62,8 +30,11 @@ def obtener_coords(ciudad):
 
     params = {"text": ciudad + ", Spain", "limit": 1, "apiKey": API_KEY}
 
-    response = requests.get(url, params=params)
-    data = response.json()
+    try:
+        response = requests.get(url, params=params, timeout=4)
+        data = response.json()
+    except requests.RequestException:
+        return None, None
 
     if data.get("features"):
         coords = data["features"][0]["geometry"]["coordinates"]
@@ -84,6 +55,17 @@ def ciudadNormalizada(texto):
     return texto
 
 
+def detectar_idioma(texto):
+    if not texto:
+        return "es"
+    texto = texto.lower()
+    palabras_ingles = TEXTOS["deteccion_idioma"]["palabras_clave_en"]
+    for palabra in palabras_ingles:
+        if f" {palabra} " in f" {texto} " or texto.startswith(f"{palabra} ") or texto.endswith(f" {palabra}") or texto == palabra:
+            return "en"
+    return "es"
+
+
 def extraer_ciudad_del_mensaje(tracker):
     # Prioriza entidad ciudad del ultimo mensaje para permitir cambiar de ciudad.
     entities = tracker.latest_message.get("entities") or []
@@ -100,9 +82,10 @@ def extraer_ciudad_del_mensaje(tracker):
     return None
 
 
-def buscar_en_wikipedia(monumento):
-    url = "https://es.wikipedia.org/w/api.php"
-    # CAMBIO: Wikipedia exige User-Agent en la API de busqueda (evita 403).
+def buscar_en_wikipedia(monumento, idioma="es"):
+    url = f"https://{idioma}.wikipedia.org/w/api.php"
+    # IMPORTANTE: Wikipedia bloqueaba las llamadas y daba error 403, me volvi loco buscando en google. 
+    # Hay que poner el User-Agent si o si para que sepan que es un proyecto
     headers = {"User-Agent": "ThothBot/1.0 (proyecto TFG)"}
 
     params = {
@@ -115,7 +98,7 @@ def buscar_en_wikipedia(monumento):
 
     # CAMBIO: peticion robusta con timeout y control de errores de red.
     try:
-        response = requests.get(url, params=params, headers=headers, timeout=12)
+        response = requests.get(url, params=params, headers=headers, timeout=4)
     except requests.RequestException as e:
         print("ERROR Wikipedia search:", e)
         return None
@@ -138,15 +121,15 @@ def buscar_en_wikipedia(monumento):
     return None
 
 
-def obtener_resumen_wikipedia(titulo):
+def obtener_resumen_wikipedia(titulo, idioma="es"):
     titulo_encoded = urllib.parse.quote(titulo.replace(" ", "_"))
-    url = f"https://es.wikipedia.org/api/rest_v1/page/summary/{titulo_encoded}"
+    url = f"https://{idioma}.wikipedia.org/api/rest_v1/page/summary/{titulo_encoded}"
 
     # CAMBIO: mantener User-Agent tambien en endpoint REST de resumen.
     headers = {"User-Agent": "ThothBot/1.0 (proyecto TFG)"}
 
     try:
-        response = requests.get(url, headers=headers)
+        response = requests.get(url, headers=headers, timeout=4)
 
         if response.status_code != 200 or not response.text:
             return None
@@ -171,11 +154,15 @@ def obtener_resumen_wikipedia(titulo):
             resultado += f"\n_{descripcion}_"
         resultado += f"\n\n{resumen_corto}"
         if link:
-            resultado += f"\n\n🔗 Más info: {link}"
+            if idioma == "en":
+                resultado += f"\n\nMore info: {link}"
+            else:
+                resultado += f"\n\nMás info: {link}"
 
         return resultado
 
     except Exception as e:
+        # TODO: Mejorar este print porque a veces sale en consola y asusta
         print("ERROR Wikipedia summary:", e)
         return None
 
@@ -188,6 +175,7 @@ class ActionBuscarMonumentos(Action):
     def run(self, dispatcher, tracker, domain):
 
         mensaje = tracker.latest_message.get("text").lower()
+        idioma = detectar_idioma(mensaje)
 
         #  detectar si es monumento
         if any(
@@ -201,11 +189,13 @@ class ActionBuscarMonumentos(Action):
                 "iglesia",
                 "monasterio",
                 "castillo",
+                "castle",
+                "cathedral",
+                "church",
+                "palace",
             ]
         ):
-            dispatcher.utter_message(
-                text="Eso parece un monumento. Voy a darte información."
-            )
+            dispatcher.utter_message(text=TEXTOS["action_buscar_monumentos"]["respuestas"][idioma]["parece_monumento"])
             return [FollowupAction("action_info_monumento")]
 
         ciudad = tracker.get_slot("ciudad")
@@ -221,7 +211,7 @@ class ActionBuscarMonumentos(Action):
             if palabras:
                 ciudad = palabras[-1]
 
-        # Revitar fallo si Mongo no funciona
+        # Evitar fallo si Mongo no funciona porque a veces me olvido de levantar el docker
         try:
             mensaje = tracker.latest_message.get("text")
             intent = tracker.latest_message.get("intent").get("name")
@@ -231,14 +221,14 @@ class ActionBuscarMonumentos(Action):
 
         #  si no hay ciudad
         if not ciudad:
-            dispatcher.utter_message(text="¿En qué ciudad quieres buscar monumentos?")
+            dispatcher.utter_message(text=TEXTOS["action_buscar_monumentos"]["respuestas"][idioma]["pedir_ciudad"])
             return []
 
         #  obtener coordenadas dinámicamente
         lat, lon = obtener_coords(ciudad)
 
         if not lat or not lon:
-            dispatcher.utter_message(text=f"No encontré la ciudad {ciudad}.")
+            dispatcher.utter_message(text=TEXTOS["action_buscar_monumentos"]["respuestas"][idioma]["ciudad_no_encontrada"].format(ciudad=ciudad))
             return []
 
         # llamada a Geoapify
@@ -252,7 +242,7 @@ class ActionBuscarMonumentos(Action):
         }
 
         try:
-            response = requests.get(url, params=params)
+            response = requests.get(url, params=params, timeout=4)
             data = response.json()
 
             lugares = []
@@ -263,18 +253,16 @@ class ActionBuscarMonumentos(Action):
                     lugares.append(nombre)
 
             if lugares:
-                respuesta = f"En {ciudad.capitalize()} puedes visitar:\n"
+                respuesta = TEXTOS["action_buscar_monumentos"]["respuestas"][idioma]["resultado_exito"].format(ciudad=ciudad.capitalize())
                 for l in lugares:
                     respuesta += f"- {l}\n"
             else:
-                respuesta = f"No encontré monumentos en {ciudad}."
+                respuesta = TEXTOS["action_buscar_monumentos"]["respuestas"][idioma]["resultado_vacio"].format(ciudad=ciudad)
 
             dispatcher.utter_message(text=respuesta)
 
         except Exception as e:
-            dispatcher.utter_message(
-                text="Hubo un problema al consultar los monumentos."
-            )
+            dispatcher.utter_message(text=TEXTOS["action_buscar_monumentos"]["respuestas"][idioma]["error_api"])
             print(e)
 
         return [SlotSet("ciudad", ciudad)]
@@ -299,41 +287,69 @@ class ActionBuscarEventos(Action):
             if palabras:
                 ciudad = palabras[-1]
 
+        mensaje = tracker.latest_message.get("text", "").lower()
+        idioma = detectar_idioma(mensaje)
+
         if not ciudad:
-            dispatcher.utter_message(text="¿En que ciudad?")
+            dispatcher.utter_message(text=TEXTOS["action_buscar_eventos"]["respuestas"][idioma]["pedir_ciudad_corta"])
             return []
+            
         ciudad = ciudadNormalizada(ciudad)
 
-        if ciudad:
+        if not ciudad:
+            dispatcher.utter_message(text=TEXTOS["action_buscar_eventos"]["respuestas"][idioma]["pedir_ciudad"])
+            return []
+        
+        # Determinar el tipo de evento basado en el mensaje
+        classification = ""
+        if "teatro" in mensaje:
+            classification = "Arts & Theatre"
+        elif "concierto" in mensaje or "festival" in mensaje or "musica" in mensaje:
+            classification = "Music"
+        elif "deporte" in mensaje or "partido" in mensaje:
+            classification = "Sports"
 
-            if ciudad in eventos:
+        url = "https://app.ticketmaster.com/discovery/v2/events.json"
+        params = {
+            "apikey": TK_API_KEY,
+            "countryCode": "ES",
+            "city": ciudad,
+            "size": 5,
+            "sort": "date,asc"
+        }
+        
+        if classification:
+            params["classificationName"] = classification
 
-                mensaje = tracker.latest_message.get("text").lower()
+        try:
+            response = requests.get(url, params=params, timeout=5)
 
-                lista = eventos[ciudad]
+            if response.status_code == 200:
+                data = response.json()
+                eventos_encontrados = data.get("_embedded", {}).get("events", [])
+                
+                if eventos_encontrados:
+                    respuesta = TEXTOS["action_buscar_eventos"]["respuestas"][idioma]["resultado_exito"].format(ciudad=ciudad.capitalize())
+                    enlace_texto = TEXTOS["action_buscar_eventos"]["respuestas"][idioma]["enlace_entradas"]
 
-                # Filtrado por tipo
-                if "teatro" in mensaje:
-                    lista = [e for e in lista if "teatro" in e.lower()]
-
-                elif "concierto" in mensaje:
-                    lista = [e for e in lista if "concierto" in e.lower()]
-
-                elif "festival" in mensaje:
-                    lista = [e for e in lista if "festival" in e.lower()]
-
-                respuesta = f"En {ciudad.capitalize()} puedes asistir a:\n"
-
-                for e in lista:
-                    respuesta += f"- {e}\n"
-
-                dispatcher.utter_message(text=respuesta)
-
+                    for evento in eventos_encontrados:
+                        nombre = evento.get("name", "Evento sin nombre")
+                        url_evento = evento.get("url", "")
+                        if url_evento:
+                            respuesta += f"- {nombre} ([{enlace_texto}]({url_evento}))\n"
+                        else:
+                            respuesta += f"- {nombre}\n"
+                            
+                    dispatcher.utter_message(text=respuesta)
+                else:
+                    dispatcher.utter_message(text=TEXTOS["action_buscar_eventos"]["respuestas"][idioma]["resultado_vacio"].format(ciudad=ciudad.capitalize()))
             else:
-                dispatcher.utter_message(text="No tengo eventos para esta ciudad.")
-
-        else:
-            dispatcher.utter_message(text="¿En qué ciudad quieres buscar eventos?")
+                dispatcher.utter_message(text=TEXTOS["action_buscar_eventos"]["respuestas"][idioma]["error_api"])
+                print(f"Error Ticketmaster API: {response.status_code} - {response.text}")
+                
+        except Exception as e:
+            dispatcher.utter_message(text=TEXTOS["action_buscar_eventos"]["respuestas"][idioma]["error_conexion"])
+            print("Error Exception Ticketmaster:", e)
 
         return [SlotSet("ciudad", ciudad)]
 
@@ -344,30 +360,31 @@ class ActionRecomendarPlanes(Action):
 
     def run(self, dispatcher, tracker, domain):
 
+        mensaje = tracker.latest_message.get("text", "").lower()
+        idioma = detectar_idioma(mensaje)
+        
         ciudad = tracker.get_slot("ciudad")
         ciudad_mensaje = extraer_ciudad_del_mensaje(tracker)
         if ciudad_mensaje:
             ciudad = ciudad_mensaje
 
         if not ciudad:
-            dispatcher.utter_message(text="¿En que ciudad quieres recomendaciones?")
+            dispatcher.utter_message(text=TEXTOS["action_recomendar_planes"]["respuestas"][idioma]["pedir_ciudad"])
             return []
 
         ciudad = ciudadNormalizada(ciudad)
         if ciudad:
-            ciudad = ciudadNormalizada(ciudad)
+            recomendaciones = TEXTOS["action_recomendar_planes"]["recomendaciones"]
             if ciudad in recomendaciones:
-                lista = recomendaciones[ciudad]
-                respuesta = f"En {ciudad.capitalize()} te recomiendo:\n"
+                lista = recomendaciones[ciudad].get(idioma, recomendaciones[ciudad]["es"])
+                respuesta = TEXTOS["action_recomendar_planes"]["respuestas"][idioma]["resultado_exito"].format(ciudad=ciudad.capitalize())
                 for m in lista:
                     respuesta += f"- {m}\n"
                 dispatcher.utter_message(text=respuesta)
             else:
-                dispatcher.utter_message(
-                    text="Todavia no dispongo de recomendaciones para esa ciudad."
-                )
+                dispatcher.utter_message(text=TEXTOS["action_recomendar_planes"]["respuestas"][idioma]["no_recomendaciones"])
         else:
-            dispatcher.utter_message(text="¿En que ciudad quieres recomendaciones?")
+            dispatcher.utter_message(text=TEXTOS["action_recomendar_planes"]["respuestas"][idioma]["pedir_ciudad"])
         return [SlotSet("ciudad", ciudad)]
 
 
@@ -379,12 +396,11 @@ class ActionInfoMonumento(Action):
     def run(self, dispatcher, tracker, domain):
 
         mensaje = tracker.latest_message.get("text").lower()
+        idioma = detectar_idioma(mensaje)
 
         # evitar confusión con eventos
-        if "festival" in mensaje or "concierto" in mensaje or "teatro" in mensaje:
-            dispatcher.utter_message(
-                text="Eso parece un evento. Puedes preguntarme por eventos en una ciudad."
-            )
+        if "festival" in mensaje or "concierto" in mensaje or "teatro" in mensaje or "event" in mensaje or "concert" in mensaje:
+            dispatcher.utter_message(text=TEXTOS["action_info_monumento"]["respuestas"][idioma]["parece_evento"])
             return []
 
         monumento = tracker.get_slot("monumento")
@@ -392,21 +408,11 @@ class ActionInfoMonumento(Action):
         # Antes: monumento = monumento.replace(" de ", " ")
         texto = tracker.latest_message.get("text").lower()
 
-        # 🔥 reconstrucción inteligente si el slot falla
+        # TODO: revisar si esto esta bien, lo copie de stackoverflow para limpiar 
+        # las palabras basuras cuando el intent falla y pilla cosas raras
         if not monumento or len(monumento) < 3 or monumento == "de":
 
-            stopwords = [
-                "que",
-                "es",
-                "de",
-                "la",
-                "el",
-                "dime",
-                "algo",
-                "sobre",
-                "informacion",
-                "sabes",
-            ]
+            stopwords = TEXTOS["action_info_monumento"].get(f"stopwords_{idioma}", TEXTOS["action_info_monumento"]["stopwords_es"])
 
             palabras = texto.split()
             palabras_limpias = [p for p in palabras if p not in stopwords]
@@ -416,24 +422,25 @@ class ActionInfoMonumento(Action):
 
         # validación final
         if not monumento or len(monumento.strip()) < 3:
-            dispatcher.utter_message(text="¿Sobre qué monumento quieres información?")
+            dispatcher.utter_message(text=TEXTOS["action_info_monumento"]["respuestas"][idioma]["pedir_monumento"])
             return []
 
         #  normalizar texto
         monumento = ciudadNormalizada(monumento)
-        for prefijo in ["la ", "el ", "los ", "las "]:
+        prefijos = TEXTOS["action_info_monumento"]["prefijos"]
+        for prefijo in prefijos:
             if monumento.startswith(prefijo):
                 monumento = monumento[len(prefijo) :]
         # buscar título en Wikipedia
-        titulo = buscar_en_wikipedia(monumento)
+        titulo = buscar_en_wikipedia(monumento, idioma)
 
         if not titulo:
             titulo = monumento
 
-        respuesta = obtener_resumen_wikipedia(titulo)
+        respuesta = obtener_resumen_wikipedia(titulo, idioma)
 
         if not respuesta:
-            respuesta = f"No encontré información fiable sobre '{monumento}'."
+            respuesta = TEXTOS["action_info_monumento"]["respuestas"][idioma]["no_encontrado"].format(monumento=monumento)
 
         dispatcher.utter_message(text=respuesta)
         return []

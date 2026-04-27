@@ -1,0 +1,96 @@
+{
+  "deteccion_idioma": {
+    "palabras_clave_en": [
+      "what", "how", "in", "the", "to", "do", "events", "monuments", "see", 
+      "recommend", "suggest", "is", "are", "hello", "hi", "info", "information", 
+      "about", "tell", "give", "can", "you", "know", "please", "search", "want", "of"
+    ]
+  },
+  "action_info_monumento": {
+    "stopwords_es": ["que", "es", "de", "la", "el", "los", "las", "dime", "algo", "sobre", "informacion", "sabes", "me", "das", "puedes", "dar", "decir", "buscar", "por", "favor", "quiero", "ver", "conocer", "un", "una"],
+    "stopwords_en": ["what", "is", "tell", "about", "info", "information", "on", "know", "give", "can", "you", "something", "the", "a", "an", "please", "search", "want", "to", "see", "of", "de", "la", "el", "los", "las", "del"],
+    "prefijos": ["la ", "el ", "los ", "las ", "the ", "a ", "an "],
+    "respuestas": {
+      "es": {
+        "parece_evento": "Eso parece un evento. Puedes preguntarme por eventos en una ciudad.",
+        "pedir_monumento": "¿Sobre qué monumento quieres información? Te sugiero preguntarme así: 'dime algo sobre el Templo de Debod' o 'información sobre la Giralda'.",
+        "no_encontrado": "No encontré información fiable sobre '{monumento}'.\n\n*Consejo:* Para que pueda entenderte mejor, intenta usar el nombre exacto del lugar o formular la frase de forma sencilla, por ejemplo: 'háblame de la Mezquita' o 'información sobre el Palacio Real'."
+      },
+      "en": {
+        "parece_evento": "That seems to be an event. You can ask me for events in a city.",
+        "pedir_monumento": "Which monument do you want information about? Try to be specific, for example: 'tell me about the Alhambra'.",
+        "no_encontrado": "I couldn't find reliable information about '{monumento}'.\n\n*Tip:* To help me understand, try using the exact name of the place, for example: 'tell me about the Alhambra' or 'information about the Royal Palace'."
+      }
+    }
+  },
+  "action_buscar_monumentos": {
+    "respuestas": {
+      "es": {
+        "parece_monumento": "Eso parece un monumento. Voy a darte información.",
+        "pedir_ciudad": "¿En qué ciudad quieres buscar monumentos?",
+        "ciudad_no_encontrada": "No encontré la ciudad {ciudad}.",
+        "resultado_exito": "En {ciudad} puedes visitar:\n",
+        "resultado_vacio": "No encontré monumentos en {ciudad}.",
+        "error_api": "Hubo un problema al consultar los monumentos."
+      },
+      "en": {
+        "parece_monumento": "That sounds like a monument. Let me give you some information.",
+        "pedir_ciudad": "In which city do you want to search for monuments?",
+        "ciudad_no_encontrada": "I couldn't find the city {ciudad}.",
+        "resultado_exito": "In {ciudad} you can visit:\n",
+        "resultado_vacio": "I didn't find any monuments in {ciudad}.",
+        "error_api": "There was a problem querying the monuments."
+      }
+    }
+  },
+  "action_buscar_eventos": {
+    "respuestas": {
+      "es": {
+        "pedir_ciudad_corta": "¿En que ciudad?",
+        "pedir_ciudad": "¿En qué ciudad quieres buscar eventos?",
+        "resultado_exito": "En {ciudad} puedes asistir a los siguientes eventos:\n",
+        "enlace_entradas": "Entradas",
+        "resultado_vacio": "No tengo eventos próximos para {ciudad} en este momento.",
+        "error_api": "Hubo un problema al consultar los eventos en Ticketmaster.",
+        "error_conexion": "Hubo un problema de conexión al buscar los eventos."
+      },
+      "en": {
+        "pedir_ciudad_corta": "In which city?",
+        "pedir_ciudad": "In which city do you want to search for events?",
+        "resultado_exito": "In {ciudad} you can attend the following events:\n",
+        "enlace_entradas": "Tickets",
+        "resultado_vacio": "I have no upcoming events for {ciudad} right now.",
+        "error_api": "There was an issue querying events on Ticketmaster.",
+        "error_conexion": "There was a connection issue when searching for events."
+      }
+    }
+  },
+  "action_recomendar_planes": {
+    "recomendaciones": {
+      "cordoba": {
+        "es": ["Visitar la Mezquita de Córdoba", "Pasear por la Judería", "Ver el Puente Romano al atardecer"],
+        "en": ["Visit the Mosque of Cordoba", "Walk around the Jewish Quarter", "See the Roman Bridge at sunset"]
+      },
+      "granada": {
+        "es": ["Visitar la Alhambra", "Pasear por el Albaicín", "Ver el Mirador de San Nicolás"],
+        "en": ["Visit the Alhambra", "Walk around the Albaicin", "See the San Nicolas viewpoint"]
+      },
+      "sevilla": {
+        "es": ["Visitar la Plaza de España", "Entrar en el Real Alcázar", "Pasear por el barrio de Triana"],
+        "en": ["Visit the Plaza de Espana", "Enter the Real Alcazar", "Walk around the Triana neighborhood"]
+      }
+    },
+    "respuestas": {
+      "es": {
+        "pedir_ciudad": "¿En que ciudad quieres recomendaciones?",
+        "resultado_exito": "En {ciudad} te recomiendo:\n",
+        "no_recomendaciones": "Todavia no dispongo de recomendaciones para esa ciudad."
+      },
+      "en": {
+        "pedir_ciudad": "In which city do you want recommendations?",
+        "resultado_exito": "In {ciudad} I recommend:\n",
+        "no_recomendaciones": "I don't have recommendations for that city yet."
+      }
+    }
+  }
+}

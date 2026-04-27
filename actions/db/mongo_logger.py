@@ -2,7 +2,7 @@ from pymongo import MongoClient
 from datetime import datetime
 
 
-cliente = MongoClient('localhost', 27017) # Datos de mi mongo local
+cliente = MongoClient('localhost', 27017, serverSelectionTimeoutMS=2000) # Datos de mi mongo local
 
 db = cliente["thotbot"]
 

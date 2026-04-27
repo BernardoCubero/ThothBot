@@ -1,0 +1,20 @@
+Bot loaded. Type a message and press enter (use '/stop' to exit): 
+Your input ->  hi                                                                                                                                                                                         
+Hola, soy Thothbot, Puedo ayudarte a descrubrir monumentos, eventos y actividades en la Ciudad que tu Elijas
+Your input ->  tourist places in frigiliana                                                                                                                                                               
+In Frigiliana you can visit:
+- Fábrica San Miguel                                                                                                                                                                                      
+- Rapto de Europa                                                                                                                                                                                         
+- N-340                                                                                                                                                                                                   
+- Memorial Padre Blas Infante                                                                                                                                                                             
+- Alcalde Antonio Villasclaras Rosas                                                                                                                                                                      
+- Castillo Lizar (Restos)                                                                                                                                                                                 
+- Acueducto del Tablazo                                                                                                                                                                                   
+- Domingo F. Sarmiento                                                                                                                                                                                    
+- Venta Cebollera                                                                                                                                                                                         
+- Corral de Pinto.                                                                                                                                                                                        
+Your input ->  info about castillo lizar                                                                                                                                                                  
+*List of songs recorded by Shakira*
+Shakira is a Colombian singer who has recorded songs for twelve studio albums, three compilation albums, two live albums and two promotional albums. She has released 68 singles, two extended plays, 35 music videos and three music DVDs. She released two albums Magia (1991) and Peligro (1993), before releasing a third album Pies Descalzos in 1995.                                                         
+🔗 More info: https://en.wikipedia.org/wiki/List_of_songs_recorded_by_Shakira
+Your input ->      sigue igual puedes comprarlo
