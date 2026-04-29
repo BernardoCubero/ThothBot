@@ -167,6 +167,39 @@ def obtener_resumen_wikipedia(titulo, idioma="es"):
         return None
 
 
+def tiene_info_wikipedia(nombre, idioma="es", ciudad=None):
+    """
+    Comprueba rapidamente si un monumento tiene articulo valido en Wikipedia.
+    Usa opensearch (mas preciso que list=search) y timeout corto para no
+    ralentizar la lista de resultados. Si se proporciona ciudad, enriquece
+    la busqueda con contexto geografico para evitar falsos positivos de
+    lugares homonimos en otros paises. Retorna True si hay un titulo con
+    similitud aceptable, False en caso contrario.
+    """
+    try:
+        url = f"https://{idioma}.wikipedia.org/w/api.php"
+        headers = {"User-Agent": "ThothBot/1.0 (proyecto TFG)"}
+        # Enriquecer con ciudad para desambiguar geograficamente
+        query = f"{nombre} {ciudad}" if ciudad else nombre
+        params = {
+            "action": "opensearch",
+            "search": query,
+            "limit": 1,
+            "format": "json",
+        }
+        response = requests.get(url, params=params, headers=headers, timeout=2)
+        data = response.json()
+        # opensearch devuelve [query, [titulos], [descripciones], [urls]]
+        titulos = data[1] if len(data) > 1 else []
+        if titulos:
+            titulo = titulos[0]
+            if get_close_matches(nombre.lower(), [titulo.lower()], cutoff=0.3):
+                return True
+    except Exception:
+        pass
+    return False
+
+
 class ActionBuscarMonumentos(Action):
 
     def name(self):
@@ -202,12 +235,23 @@ class ActionBuscarMonumentos(Action):
         ciudad_mensaje = extraer_ciudad_del_mensaje(tracker)
         if ciudad_mensaje:
             ciudad = ciudad_mensaje
+        else:
+            # CAMBIO: Si el NLU no extrae entidad ciudad, intentar detectarla desde
+            # la última palabra del mensaje. Esto permite cambiar de ciudad en la misma
+            # sesión aunque el slot ya tenga un valor anterior (ej: "quiero visitar llanes")
+            texto_original = tracker.latest_message.get("text", "")
+            palabras = texto_original.split()
+            if palabras:
+                candidata = palabras[-1].lower().strip()
+                # Solo usamos la candidata si es distinta a la ciudad actual del slot
+                # para no sobreescribir si el usuario no está mencionando una ciudad nueva
+                if candidata and candidata != (ciudad or "").lower():
+                    ciudad = candidata
 
-        # luego fallback
+        # fallback final si no hay ciudad de ningún modo
         if not ciudad:
-            texto = tracker.latest_message.get("text")
+            texto = tracker.latest_message.get("text", "")
             palabras = texto.split()
-
             if palabras:
                 ciudad = palabras[-1]
 
@@ -248,8 +292,22 @@ class ActionBuscarMonumentos(Action):
             lugares = []
 
             for lugar in data.get("features", []):
-                nombre = lugar["properties"].get("name")
-                if nombre:
+                props = lugar.get("properties", {})
+                nombre = props.get("name")
+                if not nombre:
+                    continue
+
+                # Estrategia B: si Geoapify ya incluye tag wikidata/wikipedia
+                # en los metadatos del lugar, sabemos que tiene articulo sin
+                # necesidad de hacer ninguna llamada adicional.
+                raw = props.get("datasource", {}).get("raw", {})
+                tiene_wikidata = bool(raw.get("wikidata") or raw.get("wikipedia"))
+
+                # Estrategia A: si no tiene tag, verificar directamente en
+                # Wikipedia con opensearch y timeout corto (2s).
+                # Se pasa la ciudad como contexto geografico para evitar
+                # falsos positivos de lugares homonimos en otros paises.
+                if tiene_wikidata or tiene_info_wikipedia(nombre, idioma, ciudad=ciudad):
                     lugares.append(nombre)
 
             if lugares:
@@ -335,10 +393,40 @@ class ActionBuscarEventos(Action):
                     for evento in eventos_encontrados:
                         nombre = evento.get("name", "Evento sin nombre")
                         url_evento = evento.get("url", "")
+
+                        # Fecha y hora del evento
+                        fechas = evento.get("dates", {}).get("start", {})
+                        fecha = fechas.get("localDate", "")   # ej: "2025-06-14"
+                        hora  = fechas.get("localTime", "")   # ej: "20:00:00"
+                        fecha_fmt = ""
+                        if fecha:
+                            partes = fecha.split("-")
+                            if len(partes) == 3:
+                                fecha_fmt = f"{partes[2]}/{partes[1]}/{partes[0]}"
+                        if hora:
+                            fecha_fmt += f" {hora[:5]}h"
+
+                        # Rango de precio (no siempre esta disponible en Ticketmaster)
+                        precios = evento.get("priceRanges", [])
+                        precio_fmt = ""
+                        if precios:
+                            pmin = precios[0].get("min")
+                            pmax = precios[0].get("max")
+                            cur  = precios[0].get("currency", "EUR")
+                            if pmin is not None and pmax is not None and pmin != pmax:
+                                precio_fmt = f"{pmin:.0f}\u2013{pmax:.0f} {cur}"
+                            elif pmin is not None:
+                                precio_fmt = f"desde {pmin:.0f} {cur}"
+
+                        # Componer linea con los campos disponibles
+                        linea = f"- **{nombre}**"
+                        if fecha_fmt:
+                            linea += f" \u00b7 \U0001f4c5 {fecha_fmt}"
+                        if precio_fmt:
+                            linea += f" \u00b7 \U0001f39f {precio_fmt}"
                         if url_evento:
-                            respuesta += f"- {nombre} ([{enlace_texto}]({url_evento}))\n"
-                        else:
-                            respuesta += f"- {nombre}\n"
+                            linea += f" · [{enlace_texto}]({url_evento})"
+                        respuesta += linea + "\n"
                             
                     dispatcher.utter_message(text=respuesta)
                 else:
@@ -408,9 +496,22 @@ class ActionInfoMonumento(Action):
         # Antes: monumento = monumento.replace(" de ", " ")
         texto = tracker.latest_message.get("text").lower()
 
+        # Validación para detectar extracciones incompletas del NLU (ej: "castillo de") o genéricas ("iglesia")
+        es_generico = False
+        if monumento:
+            mon_limpio = monumento.strip().lower()
+            genericos = [
+                "castillo", "iglesia", "palacio", "catedral", "convento", "plaza",
+                "monasterio", "museo", "parque", "puente", "ermita", "torre", "acueducto",
+                "castle", "church", "palace", "cathedral", "convent", "square",
+                "museum", "park", "bridge", "tower"
+            ]
+            if mon_limpio.endswith(" de") or mon_limpio.endswith(" of") or mon_limpio in genericos:
+                es_generico = True
+
         # TODO: revisar si esto esta bien, lo copie de stackoverflow para limpiar 
         # las palabras basuras cuando el intent falla y pilla cosas raras
-        if not monumento or len(monumento) < 3 or monumento == "de":
+        if not monumento or len(monumento) < 3 or monumento == "de" or es_generico:
 
             stopwords = TEXTOS["action_info_monumento"].get(f"stopwords_{idioma}", TEXTOS["action_info_monumento"]["stopwords_es"])
 
@@ -431,13 +532,36 @@ class ActionInfoMonumento(Action):
         for prefijo in prefijos:
             if monumento.startswith(prefijo):
                 monumento = monumento[len(prefijo) :]
-        # buscar título en Wikipedia
-        titulo = buscar_en_wikipedia(monumento, idioma)
+        # Enriquecer busqueda con la ciudad del slot para desambiguar
+        # geograficamente (ej: "Casa Puebla Badajoz" en vez de "Casa Puebla")
+        ciudad_ctx = tracker.get_slot("ciudad")
+        query_wiki = f"{monumento} {ciudad_ctx}" if ciudad_ctx else monumento
+
+        # buscar título en Wikipedia con contexto geografico
+        titulo = buscar_en_wikipedia(query_wiki, idioma)
+
+        # Validación: Evitar falsos positivos si el título devuelto es completamente distinto (ej. Shakira)
+        if titulo and not get_close_matches(monumento.lower(), [titulo.lower()], cutoff=0.3):
+            titulo = None
+
+        idioma_busqueda = idioma
+
+        # Fallback: Si no se encuentra un resultado válido en inglés, buscar en español
+        if not titulo and idioma == "en":
+            titulo_es = buscar_en_wikipedia(query_wiki, "es")
+            if titulo_es and get_close_matches(monumento.lower(), [titulo_es.lower()], cutoff=0.3):
+                titulo = titulo_es
+                idioma_busqueda = "es"
 
         if not titulo:
-            titulo = monumento
+            # CAMBIO: Si no hay ningún título válido tras todas las validaciones,
+            # devolver directamente el mensaje de no encontrado sin hacer más búsquedas
+            # que puedan traer resultados completamente irrelevantes (ej: Patrimonio de la Humanidad)
+            respuesta = TEXTOS["action_info_monumento"]["respuestas"][idioma]["no_encontrado"].format(monumento=monumento)
+            dispatcher.utter_message(text=respuesta)
+            return []
 
-        respuesta = obtener_resumen_wikipedia(titulo, idioma)
+        respuesta = obtener_resumen_wikipedia(titulo, idioma_busqueda)
 
         if not respuesta:
             respuesta = TEXTOS["action_info_monumento"]["respuestas"][idioma]["no_encontrado"].format(monumento=monumento)
