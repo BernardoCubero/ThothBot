@@ -25,6 +25,11 @@ def cargar_i18n():
 TEXTOS = cargar_i18n()
 
 
+def es_solo_numeros(texto):
+    """Devuelve True si el texto es un número puro (ej: '123', '3')."""
+    return texto.strip().lstrip('+-').replace('.', '', 1).isdigit()
+
+
 def obtener_coords(ciudad):
     url = "https://api.geoapify.com/v1/geocode/search"
 
@@ -136,7 +141,16 @@ def obtener_resumen_wikipedia(titulo, idioma="es"):
 
         data = response.json()
 
+        # CAMBIO: Rechazar páginas de desambiguación de Wikipedia.
+        # La API REST devuelve type="disambiguation" para estas páginas.
+        # Además se comprueba la descripción por si el campo type no está presente.
+        tipo_pagina = data.get("type", "")
         descripcion = data.get("description", "")
+        terminos_disambig = ["desambiguación", "disambiguation", "wikimedia disambiguation"]
+        if tipo_pagina == "disambiguation" or any(t in descripcion.lower() for t in terminos_disambig):
+            print(f"[Wikipedia] Rechazada página de desambiguación: '{data.get('title', titulo)}'")
+            return None
+
         extract = data.get("extract", "")
         link = data.get("content_urls", {}).get("desktop", {}).get("page", "")
 
@@ -170,20 +184,21 @@ def obtener_resumen_wikipedia(titulo, idioma="es"):
 def tiene_info_wikipedia(nombre, idioma="es", ciudad=None):
     """
     Comprueba rapidamente si un monumento tiene articulo valido en Wikipedia.
-    Usa opensearch (mas preciso que list=search) y timeout corto para no
-    ralentizar la lista de resultados. Si se proporciona ciudad, enriquece
-    la busqueda con contexto geografico para evitar falsos positivos de
-    lugares homonimos en otros paises. Retorna True si hay un titulo con
-    similitud aceptable, False en caso contrario.
+    Usa opensearch con el nombre exacto (sin ciudad) porque opensearch no
+    soporta consultas compuestas y devuelve [] si hay palabras extra.
+    Si se encuentra titulo, se valida similitud con difflib.
+    Si el resultado es una disambiguation page, se descarta.
     """
     try:
         url = f"https://{idioma}.wikipedia.org/w/api.php"
         headers = {"User-Agent": "ThothBot/1.0 (proyecto TFG)"}
-        # Enriquecer con ciudad para desambiguar geograficamente
-        query = f"{nombre} {ciudad}" if ciudad else nombre
+        # IMPORTANTE: NO añadir ciudad al query de opensearch.
+        # opensearch es muy literal y devuelve [] si el query no encaja exacto
+        # con el título del artículo. La ciudad se usaba antes pero rompía
+        # monumentos famosos como "Sagrada Família barcelona" → sin resultados.
         params = {
             "action": "opensearch",
-            "search": query,
+            "search": nombre,
             "limit": 1,
             "format": "json",
         }
@@ -191,8 +206,14 @@ def tiene_info_wikipedia(nombre, idioma="es", ciudad=None):
         data = response.json()
         # opensearch devuelve [query, [titulos], [descripciones], [urls]]
         titulos = data[1] if len(data) > 1 else []
+        descripciones = data[2] if len(data) > 2 else []
         if titulos:
             titulo = titulos[0]
+            descripcion_resultado = descripciones[0].lower() if descripciones else ""
+            # Descartar páginas de desambiguación
+            terminos_disambig = ["desambiguación", "disambiguation"]
+            if any(t in descripcion_resultado for t in terminos_disambig):
+                return False
             if get_close_matches(nombre.lower(), [titulo.lower()], cutoff=0.3):
                 return True
     except Exception:
@@ -207,12 +228,17 @@ class ActionBuscarMonumentos(Action):
 
     def run(self, dispatcher, tracker, domain):
 
-        mensaje = tracker.latest_message.get("text").lower()
-        idioma = detectar_idioma(mensaje)
+        mensaje = tracker.latest_message.get("text") or ""
+        idioma = detectar_idioma(mensaje.lower())
+
+        # Rechazar entradas puramente numéricas
+        if es_solo_numeros(mensaje.strip()):
+            dispatcher.utter_message(text=TEXTOS["action_buscar_monumentos"]["respuestas"][idioma]["ciudad_no_encontrada"].format(ciudad=mensaje.strip()))
+            return []
 
         #  detectar si es monumento
         if any(
-            palabra in mensaje
+            palabra in mensaje.lower()
             for palabra in [
                 " de ",
                 " del ",
@@ -226,6 +252,9 @@ class ActionBuscarMonumentos(Action):
                 "cathedral",
                 "church",
                 "palace",
+                "information about",
+                "info about",
+                "tell me about",
             ]
         ):
             dispatcher.utter_message(text=TEXTOS["action_buscar_monumentos"]["respuestas"][idioma]["parece_monumento"])
@@ -242,10 +271,16 @@ class ActionBuscarMonumentos(Action):
             texto_original = tracker.latest_message.get("text", "")
             palabras = texto_original.split()
             if palabras:
-                candidata = palabras[-1].lower().strip()
-                # Solo usamos la candidata si es distinta a la ciudad actual del slot
-                # para no sobreescribir si el usuario no está mencionando una ciudad nueva
-                if candidata and candidata != (ciudad or "").lower():
+                # Limpiar puntuación final
+                candidata = palabras[-1].lower().strip().rstrip(".,!?")
+                palabras_ignoradas = [
+                    "monumentos", "ver", "visitar", "sitios", "lugares", "informacion",
+                    "eventos", "conciertos", "teatro", "deporte", "partido", "festival",
+                    "musica", "actividades", "planes", "recomendaciones", "sugerencias"
+                ]
+                # Solo usamos la candidata si es distinta a la ciudad actual del slot,
+                # no es un número puro, no es una palabra ignorada, y tiene al menos 2 caracteres
+                if candidata and candidata not in palabras_ignoradas and candidata != (ciudad or "").lower() and not es_solo_numeros(candidata) and len(candidata) >= 2:
                     ciudad = candidata
 
         # fallback final si no hay ciudad de ningún modo
@@ -253,7 +288,14 @@ class ActionBuscarMonumentos(Action):
             texto = tracker.latest_message.get("text", "")
             palabras = texto.split()
             if palabras:
-                ciudad = palabras[-1]
+                candidata_final = palabras[-1].lower().strip().rstrip(".,!?")
+                palabras_ignoradas = [
+                    "monumentos", "ver", "visitar", "sitios", "lugares", "informacion",
+                    "eventos", "conciertos", "teatro", "deporte", "partido", "festival",
+                    "musica", "actividades", "planes", "recomendaciones", "sugerencias"
+                ]
+                if candidata_final not in palabras_ignoradas and not es_solo_numeros(candidata_final) and len(candidata_final) >= 2:
+                    ciudad = candidata_final
 
         # Evitar fallo si Mongo no funciona porque a veces me olvido de levantar el docker
         try:
@@ -286,7 +328,7 @@ class ActionBuscarMonumentos(Action):
         }
 
         try:
-            response = requests.get(url, params=params, timeout=4)
+            response = requests.get(url, params=params, timeout=10)
             data = response.json()
 
             lugares = []
@@ -321,7 +363,7 @@ class ActionBuscarMonumentos(Action):
 
         except Exception as e:
             dispatcher.utter_message(text=TEXTOS["action_buscar_monumentos"]["respuestas"][idioma]["error_api"])
-            print(e)
+            print(f"[ERROR ActionBuscarMonumentos] tipo={type(e).__name__} detalle={e}")
 
         return [SlotSet("ciudad", ciudad)]
 
@@ -335,15 +377,40 @@ class ActionBuscarEventos(Action):
 
         ciudad = tracker.get_slot("ciudad")
         ciudad_mensaje = extraer_ciudad_del_mensaje(tracker)
+        texto_msg = tracker.latest_message.get("text") or ""
+        idioma_pre = detectar_idioma(texto_msg.lower())
+
+        # Rechazar entradas puramente numéricas
+        if es_solo_numeros(texto_msg.strip()):
+            dispatcher.utter_message(text=TEXTOS["action_buscar_eventos"]["respuestas"][idioma_pre]["pedir_ciudad"])
+            return []
+
         if ciudad_mensaje:
             ciudad = ciudad_mensaje
-
-        if not ciudad:
-            texto = tracker.latest_message.get("text")
-            palabras = texto.split()
-
+        else:
+            palabras = texto_msg.split()
             if palabras:
-                ciudad = palabras[-1]
+                candidata = palabras[-1].lower().strip().rstrip(".,!?")
+                palabras_ignoradas = [
+                    "monumentos", "ver", "visitar", "sitios", "lugares", "informacion",
+                    "eventos", "conciertos", "teatro", "deporte", "partido", "festival",
+                    "musica", "actividades", "planes", "recomendaciones", "sugerencias"
+                ]
+                if candidata and candidata not in palabras_ignoradas and candidata != (ciudad or "").lower() and not es_solo_numeros(candidata) and len(candidata) >= 2:
+                    ciudad = candidata
+
+        # fallback final si no hay ciudad de ningún modo
+        if not ciudad:
+            palabras = texto_msg.split()
+            if palabras:
+                candidata_final = palabras[-1].lower().strip().rstrip(".,!?")
+                palabras_ignoradas = [
+                    "monumentos", "ver", "visitar", "sitios", "lugares", "informacion",
+                    "eventos", "conciertos", "teatro", "deporte", "partido", "festival",
+                    "musica", "actividades", "planes", "recomendaciones", "sugerencias"
+                ]
+                if candidata_final not in palabras_ignoradas and not es_solo_numeros(candidata_final) and len(candidata_final) >= 2:
+                    ciudad = candidata_final
 
         mensaje = tracker.latest_message.get("text", "").lower()
         idioma = detectar_idioma(mensaje)
@@ -455,6 +522,29 @@ class ActionRecomendarPlanes(Action):
         ciudad_mensaje = extraer_ciudad_del_mensaje(tracker)
         if ciudad_mensaje:
             ciudad = ciudad_mensaje
+        else:
+            palabras = tracker.latest_message.get("text", "").split()
+            if palabras:
+                candidata = palabras[-1].lower().strip().rstrip(".,!?")
+                palabras_ignoradas = [
+                    "monumentos", "ver", "visitar", "sitios", "lugares", "informacion",
+                    "eventos", "conciertos", "teatro", "deporte", "partido", "festival",
+                    "musica", "actividades", "planes", "recomendaciones", "sugerencias"
+                ]
+                if candidata and candidata not in palabras_ignoradas and candidata != (ciudad or "").lower() and not es_solo_numeros(candidata) and len(candidata) >= 2:
+                    ciudad = candidata
+
+        if not ciudad:
+            palabras = tracker.latest_message.get("text", "").split()
+            if palabras:
+                candidata_final = palabras[-1].lower().strip().rstrip(".,!?")
+                palabras_ignoradas = [
+                    "monumentos", "ver", "visitar", "sitios", "lugares", "informacion",
+                    "eventos", "conciertos", "teatro", "deporte", "partido", "festival",
+                    "musica", "actividades", "planes", "recomendaciones", "sugerencias"
+                ]
+                if candidata_final not in palabras_ignoradas and not es_solo_numeros(candidata_final) and len(candidata_final) >= 2:
+                    ciudad = candidata_final
 
         if not ciudad:
             dispatcher.utter_message(text=TEXTOS["action_recomendar_planes"]["respuestas"][idioma]["pedir_ciudad"])
@@ -483,8 +573,14 @@ class ActionInfoMonumento(Action):
 
     def run(self, dispatcher, tracker, domain):
 
-        mensaje = tracker.latest_message.get("text").lower()
+        mensaje_raw = tracker.latest_message.get("text") or ""
+        mensaje = mensaje_raw.lower()
         idioma = detectar_idioma(mensaje)
+
+        # Rechazar entradas puramente numéricas o demasiado cortas
+        if es_solo_numeros(mensaje_raw.strip()) or len(mensaje_raw.strip()) < 2:
+            dispatcher.utter_message(text=TEXTOS["action_info_monumento"]["respuestas"][idioma]["pedir_monumento"])
+            return []
 
         # evitar confusión con eventos
         if "festival" in mensaje or "concierto" in mensaje or "teatro" in mensaje or "event" in mensaje or "concert" in mensaje:
@@ -540,8 +636,10 @@ class ActionInfoMonumento(Action):
         # buscar título en Wikipedia con contexto geografico
         titulo = buscar_en_wikipedia(query_wiki, idioma)
 
-        # Validación: Evitar falsos positivos si el título devuelto es completamente distinto (ej. Shakira)
-        if titulo and not get_close_matches(monumento.lower(), [titulo.lower()], cutoff=0.3):
+        # Validación: Evitar falsos positivos si el título devuelto es completamente distinto.
+        # Cutoff 0.5 para ser más estricto (0.3 era demasiado permisivo y causaba falsos positivos
+        # como "Palau Robert" → "Palau Blaugrana").
+        if titulo and not get_close_matches(monumento.lower(), [titulo.lower()], cutoff=0.5):
             titulo = None
 
         idioma_busqueda = idioma
@@ -549,7 +647,7 @@ class ActionInfoMonumento(Action):
         # Fallback: Si no se encuentra un resultado válido en inglés, buscar en español
         if not titulo and idioma == "en":
             titulo_es = buscar_en_wikipedia(query_wiki, "es")
-            if titulo_es and get_close_matches(monumento.lower(), [titulo_es.lower()], cutoff=0.3):
+            if titulo_es and get_close_matches(monumento.lower(), [titulo_es.lower()], cutoff=0.5):
                 titulo = titulo_es
                 idioma_busqueda = "es"
 

@@ -112,13 +112,17 @@ CREATE TABLE usuarios (
 
 | Paso | Estado |
 |------|--------|
-| 1 — `user_store.py` | ⬜ Pendiente |
-| 2 — Slots en domain.yml | ⬜ Pendiente |
-| 3 — Formulario en domain.yml | ⬜ Pendiente |
-| 4 — NLU | ⬜ Pendiente |
-| 5 — ActionRegistrarUsuario | ⬜ Pendiente |
-| 6 — ActionSaludoPersonalizado | ⬜ Pendiente |
-| 7 — rules.yml | ⬜ Pendiente |
-| 8 — domain.yml (acciones) | ⬜ Pendiente |
-| 9 — rasa train | ⬜ Pendiente |
-| 10 — Test | ⬜ Pendiente |
+| 1a — Crear `models/usuario.py` y `connection.py` | ✔️ COMPLETADO |
+| 1b — Script `database/setup_db.py` | ✔️ COMPLETADO |
+| 1c — Crear lógica `services/user_service.py` | ⬜ Pendiente |
+| 2 — Slots en `domain.yml` | ⬜ Pendiente |
+| 3 — Formulario en `domain.yml` | ⬜ Pendiente |
+| 4 — NLU (`nlu.yml`) | ⬜ Pendiente |
+| 5 — `ActionRegistrarUsuario` en `actions.py` | ⬜ Pendiente |
+| 6 — `ActionSaludoPersonalizado` en `actions.py` | ⬜ Pendiente |
+| 7 — `rules.yml` (conexión actions/forms) | ⬜ Pendiente |
+| 8 — Registro de acciones en `domain.yml` | ⬜ Pendiente |
+| 9 — `rasa train` | ⬜ Pendiente |
+| 10 — Pruebas finales | ⬜ Pendiente |
+
+> **Nota para mañana:** Todo el esqueleto de base de datos (`setup_db.py`, `models`, `connection.py`) ya está listo para ejecutarse. El primer paso mañana será ejecutar `python database/setup_db.py` para levantar la tabla en MariaDB, y a continuación empezar con la programación de `services/user_service.py` para poder guardar/leer usuarios desde las acciones de Rasa.

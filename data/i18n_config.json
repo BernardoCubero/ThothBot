@@ -7,9 +7,9 @@
     ]
   },
   "action_info_monumento": {
-    "stopwords_es": ["que", "es", "de", "la", "el", "los", "las", "dime", "algo", "sobre", "informacion", "sabes", "me", "das", "puedes", "dar", "decir", "buscar", "por", "favor", "quiero", "ver", "conocer", "un", "una"],
+    "stopwords_es": ["que", "es", "de", "la", "el", "los", "las", "del", "al", "dime", "algo", "sobre", "informacion", "sabes", "me", "das", "puedes", "dar", "decir", "buscar", "por", "favor", "quiero", "ver", "conocer", "un", "una"],
     "stopwords_en": ["what", "is", "tell", "about", "info", "information", "on", "know", "give", "can", "you", "something", "the", "a", "an", "please", "search", "want", "to", "see", "of", "de", "la", "el", "los", "las", "del"],
-    "prefijos": ["la ", "el ", "los ", "las ", "the ", "a ", "an "],
+    "prefijos": ["la ", "el ", "los ", "las ", "the ", "a ", "an ", "del ", "al "],
     "respuestas": {
       "es": {
         "parece_evento": "Eso parece un evento. Puedes preguntarme por eventos en una ciudad.",

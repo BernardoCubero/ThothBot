@@ -10,6 +10,7 @@ intents:
   - consultar_entradas
   - recomendar_planes
   - consultar_ciudad
+  - bot_challenge
 
 # Datos Frases
 
@@ -52,6 +53,10 @@ responses:
 
   utter_pedir_ciudad:
     - text: "¿En qué ciudad estás interesado?"
+
+  utter_bot_challenge:
+    - text: "Soy ThothBot, un asistente virtual. ¡No soy humano! 😊"
+    - text: "I'm ThothBot, a virtual assistant — not a human! 😊"
 
 
 #Acciones que usaran las Apis
