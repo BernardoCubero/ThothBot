@@ -3,12 +3,12 @@
     "palabras_clave_en": [
       "what", "how", "in", "the", "to", "do", "events", "monuments", "see", 
       "recommend", "suggest", "is", "are", "hello", "hi", "info", "information", 
-      "about", "tell", "give", "can", "you", "know", "please", "search", "want", "of"
+      "about", "tell", "give", "can", "you", "know", "please", "search", "want", "of", "visit"
     ]
   },
   "action_info_monumento": {
-    "stopwords_es": ["que", "es", "de", "la", "el", "los", "las", "del", "al", "dime", "algo", "sobre", "informacion", "sabes", "me", "das", "puedes", "dar", "decir", "buscar", "por", "favor", "quiero", "ver", "conocer", "un", "una"],
-    "stopwords_en": ["what", "is", "tell", "about", "info", "information", "on", "know", "give", "can", "you", "something", "the", "a", "an", "please", "search", "want", "to", "see", "of", "de", "la", "el", "los", "las", "del"],
+    "stopwords_es": ["que", "es", "dime", "algo", "sobre", "informacion", "sabes", "me", "das", "puedes", "dar", "decir", "buscar", "por", "favor", "quiero", "ver", "conocer", "un", "una"],
+    "stopwords_en": ["what", "is", "tell", "about", "info", "information", "on", "know", "give", "can", "you", "something", "a", "an", "please", "search", "want", "to", "see"],
     "prefijos": ["la ", "el ", "los ", "las ", "the ", "a ", "an ", "del ", "al "],
     "respuestas": {
       "es": {
@@ -90,6 +90,26 @@
         "pedir_ciudad": "In which city do you want recommendations?",
         "resultado_exito": "In {ciudad} I recommend:\n",
         "no_recomendaciones": "I don't have recommendations for that city yet."
+      }
+    }
+  },
+  "action_registro": {
+    "respuestas": {
+      "es": {
+        "saludo_conocido": "¡Hola de nuevo, {nombre}! ¿En qué te puedo ayudar hoy?",
+        "saludo_nuevo": "¡Hola! Soy ThothBot.",
+        "ask_nombre": "Para darte una mejor experiencia, ¿cómo te llamas?",
+        "ask_ciudad_origen": "¡Encantado de conocerte! ¿De qué ciudad eres?",
+        "ask_pais": "¿Y de qué país es eso?",
+        "registro_completado": "¡Genial, gracias por presentarte! He guardado tus datos. ¿En qué te puedo ayudar hoy?"
+      },
+      "en": {
+        "saludo_conocido": "Hello again, {nombre}! How can I help you today?",
+        "saludo_nuevo": "Hello! I'm ThothBot.",
+        "ask_nombre": "To give you a better experience, what is your name?",
+        "ask_ciudad_origen": "Nice to meet you! What city are you from?",
+        "ask_pais": "And what country is that in?",
+        "registro_completado": "Great, thanks for introducing yourself! I have saved your data. How can I help you today?"
       }
     }
   }

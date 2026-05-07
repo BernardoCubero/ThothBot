@@ -114,14 +114,14 @@ CREATE TABLE usuarios (
 |------|--------|
 | 1a — Crear `models/usuario.py` y `connection.py` | ✔️ COMPLETADO |
 | 1b — Script `database/setup_db.py` | ✔️ COMPLETADO |
-| 1c — Crear lógica `services/user_service.py` | ⬜ Pendiente |
-| 2 — Slots en `domain.yml` | ⬜ Pendiente |
-| 3 — Formulario en `domain.yml` | ⬜ Pendiente |
-| 4 — NLU (`nlu.yml`) | ⬜ Pendiente |
-| 5 — `ActionRegistrarUsuario` en `actions.py` | ⬜ Pendiente |
-| 6 — `ActionSaludoPersonalizado` en `actions.py` | ⬜ Pendiente |
-| 7 — `rules.yml` (conexión actions/forms) | ⬜ Pendiente |
-| 8 — Registro de acciones en `domain.yml` | ⬜ Pendiente |
+| 1c — Crear lógica `services/user_service.py` | ✔️ COMPLETADO |
+| 2 — Slots en `domain.yml` | ✔️ COMPLETADO |
+| 3 — Formulario en `domain.yml` | ✔️ COMPLETADO |
+| 4 — NLU (`nlu.yml`) | ✔️ COMPLETADO |
+| 5 — `ActionRegistrarUsuario` en `actions.py` | ✔️ COMPLETADO |
+| 6 — `ActionSaludoPersonalizado` en `actions.py` | ✔️ COMPLETADO |
+| 7 — `rules.yml` (conexión actions/forms) | ✔️ COMPLETADO |
+| 8 — Registro de acciones en `domain.yml` | ✔️ COMPLETADO |
 | 9 — `rasa train` | ⬜ Pendiente |
 | 10 — Pruebas finales | ⬜ Pendiente |
 

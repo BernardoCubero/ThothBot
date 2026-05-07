@@ -309,6 +309,14 @@ Cuando se confía en *fallbacks* heurísticos (como "tomar la última palabra co
 | 21 | `actions/actions.py` | Detección y rechazo de páginas de desambiguación de Wikipedia |
 | 22 | `actions/actions.py` | Eliminación de "ciudad" en query de opensearch que provocaba resultados nulos |
 | 23 | `actions/actions.py` | Fallback de extracción de ciudad unificado e ignora palabras clave del intent |
+| 24 | `services/user_service.py` | Creación de funciones `guardar_o_actualizar_usuario` y `obtener_usuario` para conexión con MariaDB |
+| 25 | `domain.yml`, `rules.yml` | Implementación de formulario `usuario_form` para registro de usuarios bilingüe |
+| 26 | `actions/actions.py` | Nuevas Custom Actions (`ActionAskNombre`, `ActionAskCiudadOrigen`, etc.) dinámicas según idioma |
+| 27 | `data/i18n_config.json` | Añadida palabra clave `visit` y corregidas `stopwords_en` para no romper nombres de monumentos |
+| 28 | `actions/actions.py` | Solucionada persistencia del slot `monumento` limpiándolo al final de `ActionInfoMonumento` |
+| 29 | `actions/actions.py` | Integración de API gratuita MyMemory para traducir dinámicamente resúmenes de Wikipedia de ES a EN |
+| 30 | `domain.yml`, `data/stories.yml` | Solución del problema de inicio de formulario añadiendo slot `es_usuario_nuevo` y reglas condicionales en `stories.yml` |
+| 31 | `actions/actions.py` | Lógica de fallback de extracción de monumento mejorada para priorizar frases completas ("torre de oro") frente a falsos positivos cortos del NLU ("oro", "del") |
 
 ---
 
@@ -316,5 +324,5 @@ Cuando se confía en *fallbacks* heurísticos (como "tomar la última palabra co
 
 - **[ ]** Implementar corrección ortográfica previa a Wikipedia (typos como *"alcazabar"*).
 - **[ ]** Separar intents `saludo` / `saludo_en` y `despedida` / `despedida_en` (pendiente desde Mejora 6, documentado en `REGISTRO_MEJORAS.md` sección "Pendiente Fase 2").
-- **[ ]** Continuar Mejora 14 — Registro de usuario personalizado con MariaDB (pendiente en `REGISTRO_MEJORAS2.md`).
-- **[ ]** Añadir ejemplos `"visit {ciudad}"` y `"I am in {ciudad}"` al NLU para mejorar la cobertura de intents en inglés.
+- **[x]** Continuar Mejora 14 — Registro de usuario personalizado con MariaDB (completado y hecho bilingüe).
+- **[x]** Añadir ejemplos `"visit {ciudad}"` y `"I am in {ciudad}"` al NLU para mejorar la cobertura de intents en inglés.

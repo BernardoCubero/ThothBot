@@ -9,6 +9,7 @@ import os
 import requests
 import urllib.parse
 import json
+from services.user_service import guardar_o_actualizar_usuario, obtener_usuario
 
 # Gestion de Claves Api
 load_dotenv()
@@ -126,7 +127,22 @@ def buscar_en_wikipedia(monumento, idioma="es"):
     return None
 
 
-def obtener_resumen_wikipedia(titulo, idioma="es"):
+def traducir_es_en(texto):
+    try:
+        url = "https://api.mymemory.translated.net/get"
+        params = {"q": texto, "langpair": "es|en"}
+        r = requests.get(url, params=params, timeout=3)
+        if r.status_code == 200:
+            tr = r.json().get("responseData", {}).get("translatedText")
+            if tr:
+                return tr
+    except:
+        pass
+    return texto
+
+def obtener_resumen_wikipedia(titulo, idioma="es", idioma_ui=None):
+    if idioma_ui is None:
+        idioma_ui = idioma
     titulo_encoded = urllib.parse.quote(titulo.replace(" ", "_"))
     url = f"https://{idioma}.wikipedia.org/api/rest_v1/page/summary/{titulo_encoded}"
 
@@ -163,12 +179,17 @@ def obtener_resumen_wikipedia(titulo, idioma="es"):
         if not resumen_corto:
             return None
 
+        if idioma == "es" and idioma_ui == "en":
+            if descripcion:
+                descripcion = traducir_es_en(descripcion)
+            resumen_corto = traducir_es_en(resumen_corto)
+
         resultado = f" *{titulo}*"
         if descripcion:
             resultado += f"\n_{descripcion}_"
         resultado += f"\n\n{resumen_corto}"
         if link:
-            if idioma == "en":
+            if idioma_ui == "en":
                 resultado += f"\n\nMore info: {link}"
             else:
                 resultado += f"\n\nMás info: {link}"
@@ -580,12 +601,12 @@ class ActionInfoMonumento(Action):
         # Rechazar entradas puramente numéricas o demasiado cortas
         if es_solo_numeros(mensaje_raw.strip()) or len(mensaje_raw.strip()) < 2:
             dispatcher.utter_message(text=TEXTOS["action_info_monumento"]["respuestas"][idioma]["pedir_monumento"])
-            return []
+            return [SlotSet("monumento", None)]
 
         # evitar confusión con eventos
         if "festival" in mensaje or "concierto" in mensaje or "teatro" in mensaje or "event" in mensaje or "concert" in mensaje:
             dispatcher.utter_message(text=TEXTOS["action_info_monumento"]["respuestas"][idioma]["parece_evento"])
-            return []
+            return [SlotSet("monumento", None)]
 
         monumento = tracker.get_slot("monumento")
         # CAMBIO: se elimino reemplazar " de " para no degradar nombres validos.
@@ -605,22 +626,25 @@ class ActionInfoMonumento(Action):
             if mon_limpio.endswith(" de") or mon_limpio.endswith(" of") or mon_limpio in genericos:
                 es_generico = True
 
-        # TODO: revisar si esto esta bien, lo copie de stackoverflow para limpiar 
-        # las palabras basuras cuando el intent falla y pilla cosas raras
-        if not monumento or len(monumento) < 3 or monumento == "de" or es_generico:
+        stopwords = TEXTOS["action_info_monumento"].get(f"stopwords_{idioma}", TEXTOS["action_info_monumento"]["stopwords_es"])
+        palabras = texto.split()
+        palabras_limpias = [p for p in palabras if p not in stopwords]
+        monumento_fallback = " ".join(palabras_limpias)
 
-            stopwords = TEXTOS["action_info_monumento"].get(f"stopwords_{idioma}", TEXTOS["action_info_monumento"]["stopwords_es"])
-
-            palabras = texto.split()
-            palabras_limpias = [p for p in palabras if p not in stopwords]
-
-            if palabras_limpias:
-                monumento = " ".join(palabras_limpias)
+        # Usar fallback si la extracción de Rasa es genérica, muy corta, una preposición, 
+        # o si el fallback es claramente más completo que la extracción parcial de Rasa.
+        if (not monumento or 
+            len(monumento) < 3 or 
+            monumento in ["de", "del", "el", "la", "los", "las", "the", "a", "an"] or 
+            es_generico or 
+            (monumento_fallback and monumento and (monumento in monumento_fallback) and len(monumento_fallback) > len(monumento) + 3)):
+            
+            monumento = monumento_fallback
 
         # validación final
         if not monumento or len(monumento.strip()) < 3:
             dispatcher.utter_message(text=TEXTOS["action_info_monumento"]["respuestas"][idioma]["pedir_monumento"])
-            return []
+            return [SlotSet("monumento", None)]
 
         #  normalizar texto
         monumento = ciudadNormalizada(monumento)
@@ -657,12 +681,82 @@ class ActionInfoMonumento(Action):
             # que puedan traer resultados completamente irrelevantes (ej: Patrimonio de la Humanidad)
             respuesta = TEXTOS["action_info_monumento"]["respuestas"][idioma]["no_encontrado"].format(monumento=monumento)
             dispatcher.utter_message(text=respuesta)
-            return []
+            return [SlotSet("monumento", None)]
 
-        respuesta = obtener_resumen_wikipedia(titulo, idioma_busqueda)
+        respuesta = obtener_resumen_wikipedia(titulo, idioma_busqueda, idioma_ui=idioma)
 
         if not respuesta:
             respuesta = TEXTOS["action_info_monumento"]["respuestas"][idioma]["no_encontrado"].format(monumento=monumento)
 
+        dispatcher.utter_message(text=respuesta)
+        return [SlotSet("monumento", None)]
+
+class ActionSaludoPersonalizado(Action):
+    def name(self):
+        return "action_saludo_personalizado"
+
+    def run(self, dispatcher, tracker, domain):
+        mensaje = tracker.latest_message.get("text") or ""
+        idioma = detectar_idioma(mensaje.lower())
+        sender_id = tracker.sender_id
+        usuario = obtener_usuario(sender_id)
+
+        if usuario and usuario.nombre:
+            respuesta = TEXTOS["action_registro"]["respuestas"][idioma]["saludo_conocido"].format(nombre=usuario.nombre)
+            dispatcher.utter_message(text=respuesta)
+            return [SlotSet("es_usuario_nuevo", False)]
+        else:
+            respuesta = TEXTOS["action_registro"]["respuestas"][idioma]["saludo_nuevo"]
+            dispatcher.utter_message(text=respuesta)
+            return [SlotSet("es_usuario_nuevo", True)]
+
+class ActionRegistrarUsuario(Action):
+    def name(self):
+        return "action_registrar_usuario"
+
+    def run(self, dispatcher, tracker, domain):
+        mensaje = tracker.latest_message.get("text") or ""
+        idioma = detectar_idioma(mensaje.lower())
+        sender_id = tracker.sender_id
+        nombre = tracker.get_slot("nombre")
+        ciudad_origen = tracker.get_slot("ciudad_origen")
+        pais = tracker.get_slot("pais")
+
+        guardar_o_actualizar_usuario(sender_id, nombre=nombre, ciudad_origen=ciudad_origen, pais=pais)
+        
+        respuesta = TEXTOS["action_registro"]["respuestas"][idioma]["registro_completado"]
+        dispatcher.utter_message(text=respuesta)
+        return []
+
+class ActionAskNombre(Action):
+    def name(self):
+        return "action_ask_nombre"
+    
+    def run(self, dispatcher, tracker, domain):
+        mensaje = tracker.latest_message.get("text") or ""
+        idioma = detectar_idioma(mensaje.lower())
+        respuesta = TEXTOS["action_registro"]["respuestas"][idioma]["ask_nombre"]
+        dispatcher.utter_message(text=respuesta)
+        return []
+
+class ActionAskCiudadOrigen(Action):
+    def name(self):
+        return "action_ask_ciudad_origen"
+    
+    def run(self, dispatcher, tracker, domain):
+        mensaje = tracker.latest_message.get("text") or ""
+        idioma = detectar_idioma(mensaje.lower())
+        respuesta = TEXTOS["action_registro"]["respuestas"][idioma]["ask_ciudad_origen"]
+        dispatcher.utter_message(text=respuesta)
+        return []
+
+class ActionAskPais(Action):
+    def name(self):
+        return "action_ask_pais"
+    
+    def run(self, dispatcher, tracker, domain):
+        mensaje = tracker.latest_message.get("text") or ""
+        idioma = detectar_idioma(mensaje.lower())
+        respuesta = TEXTOS["action_registro"]["respuestas"][idioma]["ask_pais"]
         dispatcher.utter_message(text=respuesta)
         return []

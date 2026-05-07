@@ -2,6 +2,22 @@ version: "3.1"
 
 stories:
 
+- story: Saludo usuario conocido
+  steps:
+    - intent: saludo
+    - action: action_saludo_personalizado
+    - slot_was_set:
+        - es_usuario_nuevo: false
+
+- story: Saludo usuario nuevo
+  steps:
+    - intent: saludo
+    - action: action_saludo_personalizado
+    - slot_was_set:
+        - es_usuario_nuevo: true
+    - action: usuario_form
+    - active_loop: usuario_form
+
 - story: buscar monumentos completo
   steps:
     - intent: buscar_monumentos

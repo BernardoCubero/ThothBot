@@ -2,10 +2,21 @@ version: "3.1"
 
 rules:
 
-- rule: saludo
+
+
+- rule: Activar formulario de usuario
   steps:
-    - intent: saludo
-    - action: utter_saludo
+    - intent: informar_datos
+    - action: usuario_form
+    - active_loop: usuario_form
+
+- rule: Enviar formulario de usuario
+  condition:
+    - active_loop: usuario_form
+  steps:
+    - action: usuario_form
+    - active_loop: null
+    - action: action_registrar_usuario
 
 - rule: despedida
   steps:

@@ -1,65 +1,66 @@
-# Manual rapido: consultas a Wikipedia en ThothBot
+# Manual rápido: consultas a Wikipedia en ThothBot
 
-Este manual explica como funciona la consulta a Wikipedia para informacion de monumentos y como diagnosticar fallos.
+Este manual explica cómo funciona la consulta a Wikipedia para información de monumentos, el sistema de soporte bilingüe y cómo diagnosticar fallos.
 
-## Flujo actual
+---
 
-1. Se recibe el nombre del monumento desde la accion `action_info_monumento`.
-2. Se normaliza texto (minusculas y sin tildes) en `ciudadNormalizada`.
-3. Se busca un titulo en Wikipedia con `buscar_en_wikipedia(monumento)` usando la API de busqueda:
-   - Endpoint: `https://es.wikipedia.org/w/api.php`
-   - Parametros: `action=query`, `list=search`, `srsearch=<texto>`, `format=json`, `srlimit=1`
-4. Con el titulo encontrado, se pide el resumen con `obtener_resumen_wikipedia(titulo)`:
-   - Endpoint: `https://es.wikipedia.org/api/rest_v1/page/summary/<titulo>`
-5. Se devuelve descripcion, extract corto y link.
+## 1. Flujo Bilingüe y Fallback
 
-## Punto critico obligatorio
+ThothBot detecta el idioma del usuario y prioriza la información en ese idioma. Sin embargo, muchos monumentos españoles no tienen artículo en la Wikipedia en inglés.
 
-Wikipedia puede responder `403` si no se envia cabecera `User-Agent`.
+### Proceso de decisión:
+1. **Detección:** Se identifica el idioma (`es` o `en`).
+2. **Búsqueda Primaria:** Se busca en la Wikipedia del idioma detectado.
+3. **Fallback (EN → ES):** Si el usuario habla inglés y no se encuentra el monumento en `en.wikipedia.org`, el sistema realiza una segunda búsqueda en `es.wikipedia.org`.
+4. **Traducción Automática:** Si se usa el fallback (resultado en español para usuario inglés), el sistema traduce el resumen automáticamente.
 
-En este proyecto debe mantenerse esta cabecera en ambas funciones:
-- `buscar_en_wikipedia`
-- `obtener_resumen_wikipedia`
+---
 
-Valor usado:
-- `ThothBot/1.0 (proyecto TFG)`
+## 2. Sistema de Traducción (MyMemory API)
 
-## Errores tipicos y causa
+Para garantizar que un usuario de habla inglesa reciba la información en su idioma incluso si el artículo solo existe en español, ThothBot integra la **API de MyMemory**.
 
-- `No encontre informacion fiable...`
-  - La busqueda no devolvio titulo valido.
-  - El resumen devolvio estado no 200 o cuerpo vacio.
+### Función `traducir_es_en(texto)`
+- **Proveedor:** MyMemory (Translated.net).
+- **Endpoint:** `https://api.mymemory.translated.net/get`
+- **Funcionamiento:** Envía el texto en español con el parámetro `langpair=es|en`.
+- **Resiliencia:** Si la API falla o se supera el límite de cuota, la función devuelve el texto original en español mediante un bloque `try-except` para evitar que el bot se detenga.
 
-- Respuesta `403` en busqueda
-  - Falta `User-Agent`.
+---
 
-- Resultados malos o ambiguos
-  - Nombre de monumento demasiado corto o generico.
-  - Limpieza excesiva del texto (por ejemplo, quitar conectores utiles del nombre).
+## 3. Detalles Técnicos de Consulta
 
-## Prueba rapida en terminal
+### Búsqueda de Títulos (`buscar_en_wikipedia`)
+- **Endpoint:** `https://{idioma}.wikipedia.org/w/api.php`
+- **Parámetros:** `action=query`, `list=search`, `srsearch=<texto>`, `srlimit=1`
 
-Con el entorno del proyecto:
+### Obtención de Resumen (`obtener_resumen_wikipedia`)
+- **Endpoint:** `https://{idioma}.wikipedia.org/api/rest_v1/page/summary/<titulo>`
+- **Parámetros adicionales:** `idioma_ui` (define en qué idioma se muestran las etiquetas fijas como "More info:").
 
-```bash
-/home/bernie/proyectos/ThothBot/venv/bin/python -c "import sys; sys.path.append('/home/bernie/proyectos/ThothBot'); from actions.actions import buscar_en_wikipedia, obtener_resumen_wikipedia; q='templo de debod'; t=buscar_en_wikipedia(q); print('titulo=',t); r=obtener_resumen_wikipedia(t) if t else None; print('ok=', bool(r)); print((r or '')[:220])"
-```
+---
 
-Salida esperada:
-- `titulo=` con un titulo real de Wikipedia
-- `ok= True`
+## 4. Punto crítico: User-Agent
 
-## Checklist de diagnostico
+Wikipedia bloquea peticiones sin un `User-Agent` descriptivo. **Obligatorio** en todas las funciones:
+- **Valor:** `ThothBot/1.0 (proyecto TFG)`
 
-1. Verificar que `buscar_en_wikipedia` usa `headers` con `User-Agent`.
-2. Verificar que `requests.get` tiene `timeout`.
-3. Confirmar `status_code == 200` antes de parsear JSON.
-4. Confirmar que `query.search` tiene resultados.
-5. Si no hay resultados, probar con texto de monumento mas especifico.
+---
 
-## Ubicacion del codigo
+## 5. Errores típicos y diagnóstico
 
-- `actions/actions.py`
-  - `buscar_en_wikipedia`
-  - `obtener_resumen_wikipedia`
-  - `ActionInfoMonumento.run`
+| Error | Causa | Solución |
+|-------|-------|----------|
+| `No encontré información fiable...` | Sin título válido o artículo inexistente | Refinar nombre o comprobar en navegador |
+| `403 Forbidden` | Falta `User-Agent` | Revisar cabeceras en `actions.py` |
+| Resumen en español para usuario inglés | Fallo en MyMemory API | Comprobar conexión a internet o cuota de MyMemory |
+| `oro` en lugar de `Torre del Oro` | Extracción parcial del NLU | El sistema ahora incluye un fallback que prioriza la frase completa si el NLU corta el nombre |
+
+---
+
+## Ubicación del código
+- `actions/actions.py`:
+  - `buscar_en_wikipedia`: Lógica de búsqueda.
+  - `obtener_resumen_wikipedia`: Extracción de contenido y formateo.
+  - `traducir_es_en`: Integración con MyMemory.
+  - `ActionInfoMonumento`: Coordinación del flujo y fallback bilingüe.

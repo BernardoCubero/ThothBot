@@ -11,6 +11,7 @@ intents:
   - recomendar_planes
   - consultar_ciudad
   - bot_challenge
+  - informar_datos
 
 # Datos Frases
 
@@ -19,6 +20,9 @@ entities:
   - monumento
   - evento
   - fecha
+  - nombre
+  - ciudad_origen
+  - pais
 
 #Contexto
 
@@ -38,6 +42,53 @@ slots:
     mappings:
       - type: from_entity
         entity: fecha
+  es_usuario_nuevo:
+    type: bool
+    mappings:
+      - type: custom
+  nombre:
+    type: text
+    mappings:
+      - type: from_text
+        conditions:
+          - active_loop: usuario_form
+            requested_slot: nombre
+        not_intent:
+          - buscar_monumentos
+          - info_monumento
+          - buscar_eventos
+          - recomendar_planes
+  ciudad_origen:
+    type: text
+    mappings:
+      - type: from_text
+        conditions:
+          - active_loop: usuario_form
+            requested_slot: ciudad_origen
+        not_intent:
+          - buscar_monumentos
+          - info_monumento
+          - buscar_eventos
+          - recomendar_planes
+  pais:
+    type: text
+    mappings:
+      - type: from_text
+        conditions:
+          - active_loop: usuario_form
+            requested_slot: pais
+        not_intent:
+          - buscar_monumentos
+          - info_monumento
+          - buscar_eventos
+          - recomendar_planes
+
+forms:
+  usuario_form:
+    required_slots:
+      - nombre
+      - ciudad_origen
+      - pais
 
 
 
@@ -68,6 +119,11 @@ actions:
   - action_buscar_eventos
   - action_consultar_entradas
   - action_recomendar_planes
+  - action_registrar_usuario
+  - action_saludo_personalizado
+  - action_ask_nombre
+  - action_ask_ciudad_origen
+  - action_ask_pais
 
 session_config:
   session_expiration_time: 60
