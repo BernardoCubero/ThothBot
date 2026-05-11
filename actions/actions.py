@@ -1,5 +1,5 @@
 import unicodedata
-from rasa.shared.core.events import FollowupAction
+from rasa_sdk.events import FollowupAction
 from actions.db.mongo_logger import guardar_log
 from rasa_sdk import Action
 from rasa_sdk.events import SlotSet

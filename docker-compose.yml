@@ -1,0 +1,73 @@
+services:
+  # Motor principal de Rasa
+  rasa:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: thothbot-rasa
+    ports:
+      - "5005:5005"
+    env_file:
+      - .env
+    depends_on:
+      - action_server
+      - db
+    networks:
+      - thothbot-net
+
+  # Servidor de acciones personalizadas
+  action_server:
+    build:
+      context: .
+      dockerfile: actions/Dockerfile
+    container_name: thothbot-actions
+    ports:
+      - "5055:5055"
+    volumes:
+      # Solo montamos la carpeta de acciones para hot-reload sin romper el contenedor
+      - ./actions:/app/actions
+    env_file:
+      - .env
+    environment:
+      - MONGO_HOST=mongodb
+      - MARIADB_HOST=db
+    depends_on:
+      - db
+      - mongodb
+    networks:
+      - thothbot-net
+
+  # Base de datos relacional (Usuarios)
+  db:
+    image: mariadb:10.6
+    container_name: thothbot-mariadb
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MARIADB_PASSWORD}
+      MYSQL_DATABASE: ${MARIADB_DB}
+    ports:
+      - "3307:3306"
+    volumes:
+      - mariadb_data:/var/lib/mysql
+    networks:
+      - thothbot-net
+
+  # Base de datos NoSQL (Logs de conversaciones)
+  mongodb:
+    image: mongo:latest
+    container_name: thothbot-mongodb
+    restart: always
+    ports:
+      - "27018:27017"
+    volumes:
+      - mongodb_data:/data/db
+    networks:
+      - thothbot-net
+
+volumes:
+  mariadb_data:
+  mongodb_data:
+
+networks:
+  thothbot-net:
+    driver: bridge

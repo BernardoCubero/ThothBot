@@ -1,0 +1,9 @@
+venv/
+venvls/
+__pycache__/
+*.pyc
+.git/
+.idea/
+.vscode/
+*.log
+.rasa/
