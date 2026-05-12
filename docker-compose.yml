@@ -1,25 +1,40 @@
 services:
   # Motor principal de Rasa
   rasa:
-    build:
-      context: .
-      dockerfile: Dockerfile
+    image: adsl7700/thothbot-rasa:latest
     container_name: thothbot-rasa
     ports:
       - "5005:5005"
     env_file:
       - .env
+    volumes:
+      - ./models:/app/models
+      - ./credentials.yml:/app/credentials.yml
     depends_on:
       - action_server
       - db
     networks:
       - thothbot-net
 
+  # Proxy de Telegram → Rasa (evita bug del canal nativo de Rasa 3.6.x)
+  telegram_proxy:
+    build:
+      context: ./telegram_proxy
+      dockerfile: Dockerfile
+    container_name: thothbot-telegram
+    restart: always
+    env_file:
+      - .env
+    environment:
+      - RASA_URL=http://rasa:5005/webhooks/rest/webhook
+    depends_on:
+      - rasa
+    networks:
+      - thothbot-net
+
   # Servidor de acciones personalizadas
   action_server:
-    build:
-      context: .
-      dockerfile: actions/Dockerfile
+    image: adsl7700/thothbot-actions:latest
     container_name: thothbot-actions
     ports:
       - "5055:5055"
