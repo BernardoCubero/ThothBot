@@ -168,7 +168,7 @@ aiogram.utils.exceptions.ValidationError: Token is invalid!
 **Solución:** Poner el token directamente en el archivo:
 ```yaml
 telegram:
-  access_token: "8644961943:AAGgCIIFaIbVJNpPkXZD_xIpSvcr0U2aCvg"
+  access_token: "token_telegram
   verify: "thothbot_verify"
   webhook_url: "https://thothbot.alcostepc.com/webhooks/telegram/webhook"
 ```
