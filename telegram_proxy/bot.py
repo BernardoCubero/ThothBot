@@ -6,7 +6,8 @@ Evita el bug de 'Event loop is closed' del canal nativo de Rasa 3.6.x.
 import os
 import logging
 import requests
-from telegram import Update
+import re
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, MessageHandler, CommandHandler, filters, ContextTypes
 
 logging.basicConfig(
@@ -33,6 +34,22 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     await _send_to_rasa_and_reply(update, sender_id, user_message)
 
 
+def convertir_markdown(texto):
+    """Convierte markdown de GitHub a Telegram Markdown."""
+    texto = re.sub(r'\*\*(.+?)\*\*', r'*\1*', texto)
+    return texto
+
+def extraer_botones(texto):
+    """Extrae enlaces Markdown y los convierte en botones InlineKeyboardMarkup."""
+    patron = r'\[([^\]]+)\]\((https?://[^\)]+)\)'
+    botones = []
+    for match in re.finditer(patron, texto):
+        label, url = match.group(1), match.group(2)
+        botones.append([InlineKeyboardButton(label, url=url)])
+    texto_limpio = re.sub(patron, '', texto).strip()
+    return texto_limpio, botones
+
+
 async def _send_to_rasa_and_reply(update: Update, sender_id: str, message: str) -> None:
     """Envía el mensaje a Rasa y devuelve la respuesta al usuario."""
     try:
@@ -50,7 +67,20 @@ async def _send_to_rasa_and_reply(update: Update, sender_id: str, message: str) 
 
         for msg in bot_messages:
             if "text" in msg:
-                await update.message.reply_text(msg["text"])
+                texto_limpio, botones = extraer_botones(msg["text"])
+                texto_formateado = convertir_markdown(texto_limpio)
+                reply_markup = InlineKeyboardMarkup(botones) if botones else None
+                
+                # Enviar mensaje con Markdown habilitado y los botones parseados
+                try:
+                    await update.message.reply_text(
+                        texto_formateado,
+                        parse_mode='Markdown',
+                        reply_markup=reply_markup
+                    )
+                except Exception as ex:
+                    logger.error(f"Error al enviar mensaje con Markdown: {ex}. Enviando sin formato.")
+                    await update.message.reply_text(texto_limpio, reply_markup=reply_markup)
             elif "image" in msg:
                 await update.message.reply_photo(msg["image"])
 

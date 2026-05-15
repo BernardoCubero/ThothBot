@@ -7,7 +7,7 @@
     ]
   },
   "action_info_monumento": {
-    "stopwords_es": ["que", "es", "dime", "algo", "sobre", "informacion", "sabes", "me", "das", "puedes", "dar", "decir", "buscar", "por", "favor", "quiero", "ver", "conocer", "un", "una"],
+    "stopwords_es": ["que", "es", "dime", "algo", "sobre", "informacion", "sabes", "me", "das", "puedes", "dar", "decir", "buscar", "por", "favor", "quiero", "ver", "conocer", "un", "una", "dame", "hablame", "cuentame", "buscame", "enseñame", "muestrame"],
     "stopwords_en": ["what", "is", "tell", "about", "info", "information", "on", "know", "give", "can", "you", "something", "a", "an", "please", "search", "want", "to", "see"],
     "prefijos": ["la ", "el ", "los ", "las ", "the ", "a ", "an ", "del ", "al "],
     "respuestas": {

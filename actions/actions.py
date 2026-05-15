@@ -181,8 +181,9 @@ def obtener_resumen_wikipedia(titulo, idioma="es", idioma_ui=None):
 
         if idioma == "es" and idioma_ui == "en":
             if descripcion:
-                descripcion = traducir_es_en(descripcion)
-            resumen_corto = traducir_es_en(resumen_corto)
+                descripcion = traducir_es_en(descripcion[:450])
+            if resumen_corto:
+                resumen_corto = traducir_es_en(resumen_corto[:450])
 
         resultado = f" *{titulo}*"
         if descripcion:
@@ -235,7 +236,7 @@ def tiene_info_wikipedia(nombre, idioma="es", ciudad=None):
             terminos_disambig = ["desambiguación", "disambiguation"]
             if any(t in descripcion_resultado for t in terminos_disambig):
                 return False
-            if get_close_matches(nombre.lower(), [titulo.lower()], cutoff=0.3):
+            if get_close_matches(nombre.lower(), [titulo.lower()], cutoff=0.5):
                 return True
     except Exception:
         pass
@@ -342,9 +343,9 @@ class ActionBuscarMonumentos(Action):
         url = "https://api.geoapify.com/v2/places"
 
         params = {
-            "categories": "tourism.sights",
-            "filter": f"circle:{lon},{lat},5000",
-            "limit": 10,
+            "categories": "tourism.sights,heritage,building.historic,religion.place_of_worship",
+            "filter": f"circle:{lon},{lat},8000",
+            "limit": 100,
             "apiKey": API_KEY,
         }
 
@@ -352,26 +353,50 @@ class ActionBuscarMonumentos(Action):
             response = requests.get(url, params=params, timeout=10)
             data = response.json()
 
-            lugares = []
+            PRIORIDAD_WIKIDATA = []
+            SIN_WIKIDATA = []
+            
+            ignorados = [
+                "homenaje", "estatua", "triunfo", "seminario", "historic centre", "centro histórico",
+                "pintura", "área expositiva", "zona arqueológica", "puerta", "calle", "avenida",
+                "glorieta", "rotonda", "monumento a", "mirador", "pináculo", "cruz del", "salam",
+                "douglas dc7", "guadalquivir"
+            ]
+            nombres_vistos = set()
 
             for lugar in data.get("features", []):
                 props = lugar.get("properties", {})
                 nombre = props.get("name")
                 if not nombre:
                     continue
-
-                # Estrategia B: si Geoapify ya incluye tag wikidata/wikipedia
-                # en los metadatos del lugar, sabemos que tiene articulo sin
-                # necesidad de hacer ninguna llamada adicional.
+                
+                if nombre.lower() in nombres_vistos:
+                    continue
+                    
+                if any(ign in nombre.lower() for ign in ignorados):
+                    continue
+                    
+                nombres_vistos.add(nombre.lower())
+                
                 raw = props.get("datasource", {}).get("raw", {})
                 tiene_wikidata = bool(raw.get("wikidata") or raw.get("wikipedia"))
+                
+                if tiene_wikidata:
+                    PRIORIDAD_WIKIDATA.append(nombre)
+                else:
+                    SIN_WIKIDATA.append(nombre)
+                    
+            CANDIDATOS_WIKI = []
+            if len(PRIORIDAD_WIKIDATA) < 10:
+                for n in SIN_WIKIDATA:
+                    if tiene_info_wikipedia(n, idioma, ciudad=ciudad):
+                        CANDIDATOS_WIKI.append(n)
+                    if len(PRIORIDAD_WIKIDATA) + len(CANDIDATOS_WIKI) >= 10:
+                        break
 
-                # Estrategia A: si no tiene tag, verificar directamente en
-                # Wikipedia con opensearch y timeout corto (2s).
-                # Se pasa la ciudad como contexto geografico para evitar
-                # falsos positivos de lugares homonimos en otros paises.
-                if tiene_wikidata or tiene_info_wikipedia(nombre, idioma, ciudad=ciudad):
-                    lugares.append(nombre)
+            # Primero los que tienen wikidata, luego los validados via wikipedia
+            lugares = PRIORIDAD_WIKIDATA + CANDIDATOS_WIKI
+            lugares = lugares[:10]  # máximo 10 resultados
 
             if lugares:
                 respuesta = TEXTOS["action_buscar_monumentos"]["respuestas"][idioma]["resultado_exito"].format(ciudad=ciudad.capitalize())
@@ -445,6 +470,17 @@ class ActionBuscarEventos(Action):
         if not ciudad:
             dispatcher.utter_message(text=TEXTOS["action_buscar_eventos"]["respuestas"][idioma]["pedir_ciudad"])
             return []
+
+        # Mapeo de nombres en inglés a español para la API de Ticketmaster
+        mapeo_ciudades = {
+            "seville": "sevilla",
+            "saragossa": "zaragoza",
+            "majorca": "mallorca",
+            "minorca": "menorca",
+            "alicant": "alicante"
+        }
+        if ciudad in mapeo_ciudades:
+            ciudad = mapeo_ciudades[ciudad]
         
         # Determinar el tipo de evento basado en el mensaje
         classification = ""
@@ -509,11 +545,13 @@ class ActionBuscarEventos(Action):
                         # Componer linea con los campos disponibles
                         linea = f"- **{nombre}**"
                         if fecha_fmt:
-                            linea += f" \u00b7 \U0001f4c5 {fecha_fmt}"
+                            linea += f" \u00b7 {fecha_fmt}"
                         if precio_fmt:
                             linea += f" \u00b7 \U0001f39f {precio_fmt}"
                         if url_evento:
-                            linea += f" · [{enlace_texto}]({url_evento})"
+                            # Añadir el nombre del evento al texto del botón para que se diferencien
+                            nombre_corto = nombre[:25] + "..." if len(nombre) > 25 else nombre
+                            linea += f" · [🎟 {enlace_texto} - {nombre_corto}]({url_evento})"
                         respuesta += linea + "\n"
                             
                     dispatcher.utter_message(text=respuesta)
@@ -611,7 +649,7 @@ class ActionInfoMonumento(Action):
         monumento = tracker.get_slot("monumento")
         # CAMBIO: se elimino reemplazar " de " para no degradar nombres validos.
         # Antes: monumento = monumento.replace(" de ", " ")
-        texto = tracker.latest_message.get("text").lower()
+        texto = ciudadNormalizada(mensaje_raw)
 
         # Validación para detectar extracciones incompletas del NLU (ej: "castillo de") o genéricas ("iglesia")
         es_generico = False
@@ -660,10 +698,17 @@ class ActionInfoMonumento(Action):
         # buscar título en Wikipedia con contexto geografico
         titulo = buscar_en_wikipedia(query_wiki, idioma)
 
+        def es_match_valido(m, t):
+            if not t: return False
+            m_n = ciudadNormalizada(m)
+            t_n = ciudadNormalizada(t)
+            if m_n in t_n or t_n in m_n:
+                return True
+            from difflib import SequenceMatcher
+            return SequenceMatcher(None, m_n, t_n).ratio() >= 0.88
+
         # Validación: Evitar falsos positivos si el título devuelto es completamente distinto.
-        # Cutoff 0.5 para ser más estricto (0.3 era demasiado permisivo y causaba falsos positivos
-        # como "Palau Robert" → "Palau Blaugrana").
-        if titulo and not get_close_matches(monumento.lower(), [titulo.lower()], cutoff=0.5):
+        if titulo and not es_match_valido(monumento, titulo):
             titulo = None
 
         idioma_busqueda = idioma
@@ -671,7 +716,7 @@ class ActionInfoMonumento(Action):
         # Fallback: Si no se encuentra un resultado válido en inglés, buscar en español
         if not titulo and idioma == "en":
             titulo_es = buscar_en_wikipedia(query_wiki, "es")
-            if titulo_es and get_close_matches(monumento.lower(), [titulo_es.lower()], cutoff=0.5):
+            if titulo_es and es_match_valido(monumento, titulo_es):
                 titulo = titulo_es
                 idioma_busqueda = "es"
 
