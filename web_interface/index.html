@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ThothBot - Tu Guía Turístico Inteligente</title>
+    <!-- Usamos una fuente moderna de Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary-bg: #0f172a;
+            --gradient-start: #3b82f6;
+            --gradient-end: #8b5cf6;
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+        }
+
+        body,
+        html {
+            margin: 0;
+            padding: 0;
+            height: 100%;
+            font-family: 'Inter', sans-serif;
+            background-color: var(--primary-bg);
+            color: var(--text-main);
+            overflow: hidden;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+        }
+
+        /* Fondo dinámico y animado */
+        .background {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: radial-gradient(circle at top left, rgba(59, 130, 246, 0.2), transparent 40%),
+                radial-gradient(circle at bottom right, rgba(139, 92, 246, 0.2), transparent 40%);
+            z-index: 1;
+        }
+
+        .container {
+            position: relative;
+            z-index: 2;
+            max-width: 800px;
+            padding: 2rem;
+            background: rgba(30, 41, 59, 0.5);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 20px;
+            backdrop-filter: blur(10px);
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+            animation: fadeIn 1.5s ease-out;
+        }
+
+        h1 {
+            font-size: 3rem;
+            margin-bottom: 0.5rem;
+            background: linear-gradient(to right, var(--gradient-start), var(--gradient-end));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        p {
+            font-size: 1.25rem;
+            color: var(--text-muted);
+            margin-bottom: 2rem;
+        }
+
+        .pulse-icon {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: var(--gradient-end);
+            box-shadow: 0 0 0 0 rgba(139, 92, 246, 0.7);
+            animation: pulse 2s infinite;
+            margin-right: 10px;
+            vertical-align: middle;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        @keyframes pulse {
+            0% {
+                transform: scale(0.95);
+                box-shadow: 0 0 0 0 rgba(139, 92, 246, 0.7);
+            }
+
+            70% {
+                transform: scale(1);
+                box-shadow: 0 0 0 15px rgba(139, 92, 246, 0);
+            }
+
+            100% {
+                transform: scale(0.95);
+                box-shadow: 0 0 0 0 rgba(139, 92, 246, 0);
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="background"></div>
+
+    <div class="container">
+        <h1>ThothBot</h1>
+        <p>Tu asistente turístico inteligente propulsado por IA. Haz clic en la burbuja de la esquina para empezar a
+            chatear.</p>
+        <div>
+            <span class="pulse-icon"></span>
+            <span>Sistemas en línea. Bot conectado y esperando tus mensajes.</span>
+        </div>
+    </div>
+
+    <!-- Div para montar el Widget de Rasa Webchat -->
+    <div id="rasa-chat-widget"></div>
+
+    <!-- Script del Widget de Webchat -->
+    <script>
+        !(function () {
+            let e = document.createElement("script"),
+                t = document.head || document.getElementsByTagName("head")[0];
+            e.src = "https://cdn.jsdelivr.net/npm/rasa-webchat@1.0.1/lib/index.js";
+            e.async = !0;
+            e.onload = () => {
+                window.WebChat.default(
+                    {
+                        initPayload: '/greet', // Mensaje oculto que se envía al inicio para arrancar
+                        customData: { language: "es" },
+                        socketUrl: "https://thothbot.alcostepc.com", // IMPORTANTE: Cambiar si es necesario. En docker puede ser diferente.
+                        title: "ThothBot",
+                        subtitle: "Asistente Turístico Inteligente",
+                        profileAvatar: "https://api.dicebear.com/7.x/bottts/svg?seed=ThothBot&backgroundColor=3b82f6",
+                        params: { "storage": "session" }
+                    },
+                    null
+                );
+            };
+            t.insertBefore(e, t.firstChild);
+        })();
+    </script>
+</body>
+
+</html>

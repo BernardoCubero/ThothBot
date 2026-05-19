@@ -665,8 +665,16 @@ class ActionInfoMonumento(Action):
                 es_generico = True
 
         stopwords = TEXTOS["action_info_monumento"].get(f"stopwords_{idioma}", TEXTOS["action_info_monumento"]["stopwords_es"])
+        # Ampliar stopwords con preposiciones, artículos y verbos comunes.
+        # Necesario porque la imagen Docker puede tener un i18n_config.json antiguo
+        # sin las stopwords "hablame", "la", "el", etc. añadidas posteriormente.
+        stopwords_extra = {
+            "de", "del", "en", "a", "al", "los", "las", "le", "la", "el",
+            "hablame", "cuentame", "buscame", "enseñame", "muestrame", "dame",
+            "sobre", "acerca", "respecto"
+        }
         palabras = texto.split()
-        palabras_limpias = [p for p in palabras if p not in stopwords]
+        palabras_limpias = [p for p in palabras if p not in stopwords and p not in stopwords_extra]
         monumento_fallback = " ".join(palabras_limpias)
 
         # Usar fallback si la extracción de Rasa es genérica, muy corta, una preposición, 
@@ -691,9 +699,16 @@ class ActionInfoMonumento(Action):
             if monumento.startswith(prefijo):
                 monumento = monumento[len(prefijo) :]
         # Enriquecer busqueda con la ciudad del slot para desambiguar
-        # geograficamente (ej: "Casa Puebla Badajoz" en vez de "Casa Puebla")
+        # geograficamente (ej: "Casa Puebla Badajoz" en vez de "Casa Puebla").
+        # IMPORTANTE: no añadir ciudad si monumento ya la contiene o es la misma ciudad,
+        # para evitar queries tipo "cordoba Cordoba" o "de cordoba Cordoba".
         ciudad_ctx = tracker.get_slot("ciudad")
-        query_wiki = f"{monumento} {ciudad_ctx}" if ciudad_ctx else monumento
+        ciudad_ctx_norm = ciudadNormalizada(ciudad_ctx) if ciudad_ctx else ""
+        monumento_norm = ciudadNormalizada(monumento)
+        if ciudad_ctx and ciudad_ctx_norm not in monumento_norm:
+            query_wiki = f"{monumento} {ciudad_ctx}"
+        else:
+            query_wiki = monumento
 
         # buscar título en Wikipedia con contexto geografico
         titulo = buscar_en_wikipedia(query_wiki, idioma)
@@ -702,14 +717,66 @@ class ActionInfoMonumento(Action):
             if not t: return False
             m_n = ciudadNormalizada(m)
             t_n = ciudadNormalizada(t)
-            if m_n in t_n or t_n in m_n:
+            # Coincidencia exacta
+            if m_n == t_n:
+                return True
+            # El título debe EMPEZAR con el query o viceversa.
+            # Evita falsos positivos como "cordoba" → "Villanueva de Córdoba"
+            # ("cordoba" aparece al final, no al inicio del título)
+            if t_n.startswith(m_n) or m_n.startswith(t_n):
                 return True
             from difflib import SequenceMatcher
-            return SequenceMatcher(None, m_n, t_n).ratio() >= 0.88
+            # Umbral 0.65: cubre monumentos con nombres compuestos
+            # ej: "mezquita cordoba" (ratio ~0.68) ↔ "Mezquita-Catedral de Córdoba"
+            # pero rechaza "de cordoba" (ratio ~0.60) ↔ "Villaviciosa de Córdoba"
+            # El main bug ("de cordoba") ya está solucionado por stopwords_extra que elimina "de".
+            return SequenceMatcher(None, m_n, t_n).ratio() >= 0.65
 
         # Validación: Evitar falsos positivos si el título devuelto es completamente distinto.
         if titulo and not es_match_valido(monumento, titulo):
             titulo = None
+
+        # Fallback directo: si la búsqueda no dio un título válido, intentar buscar
+        # el artículo EXACTO por nombre en Wikipedia (primero via search, luego REST).
+        # Útil para ciudades y lugares conocidos (ej: "cordoba" → artículo "Córdoba").
+        if not titulo:
+            # Intentar con el nombre capitalizado directamente
+            nombre_directo = monumento.strip().title()
+            # Buscar via search API y exigir que el título devuelto sea exactamente
+            # lo que pedimos (no solo que lo contenga)
+            titulo_directo = buscar_en_wikipedia(nombre_directo, idioma)
+            if titulo_directo and ciudadNormalizada(titulo_directo) == ciudadNormalizada(nombre_directo):
+                titulo = titulo_directo
+            else:
+                # Intentar obtener el artículo directamente por URL (la API REST
+                # hace redirect automático para acentos, ej: "Cordoba" → "Córdoba")
+                import urllib.parse as _up
+                url_test = f"https://{idioma}.wikipedia.org/api/rest_v1/page/summary/{_up.quote(nombre_directo)}"
+                headers_test = {"User-Agent": "ThothBot/1.0 (proyecto TFG)"}
+                try:
+                    r_test = requests.get(url_test, headers=headers_test, timeout=4)
+                    if r_test.status_code == 200:
+                        d_test = r_test.json()
+                        titulo_rest = d_test.get("title", "")
+                        tipo_rest = d_test.get("type", "")
+                        desc_rest = d_test.get("description", "").lower()
+                        terminos_disambig = ["desambiguación", "disambiguation", "wikimedia disambiguation"]
+                        es_disambig = tipo_rest == "disambiguation" or any(t in desc_rest for t in terminos_disambig)
+                        # Solo aceptar si el título REST coincide con lo pedido
+                        if not es_disambig and es_match_valido(nombre_directo, titulo_rest):
+                            titulo = titulo_rest
+                except Exception:
+                    pass
+
+        # Fallback españa: si el título es válido pero es una página de desambiguación,
+        # intentar con "(España)" para obtener la ciudad española correcta.
+        if titulo:
+            resumen_test = obtener_resumen_wikipedia(titulo, idioma, idioma_ui=idioma)
+            if resumen_test is None:
+                # Probablemente desambiguación: intentar con contexto de país
+                titulo_esp = buscar_en_wikipedia(f"{titulo} España ciudad", idioma)
+                if titulo_esp and es_match_valido(monumento, titulo_esp):
+                    titulo = titulo_esp
 
         idioma_busqueda = idioma
 

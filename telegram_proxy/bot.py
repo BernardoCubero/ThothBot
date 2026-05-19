@@ -100,7 +100,18 @@ def main() -> None:
     app.add_handler(CommandHandler("start", start))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
     logger.info("Bot iniciado con polling...")
-    app.run_polling(allowed_updates=Update.ALL_TYPES)
+    # Asegurarse de que no hay un webhook activo que bloquee el polling
+    import asyncio
+    
+    async def delete_webhook_and_start():
+        await app.bot.delete_webhook(drop_pending_updates=True)
+        # run_polling es bloqueante, así que lo llamamos normalmente después
+        # Pero run_polling ya crea su propio loop. 
+        # En PTB 20+, lo mejor es usar drop_pending_updates=True dentro de run_polling
+        # que INTERNAMENTE debería llamar a delete_webhook si detecta el conflicto, 
+        # pero a veces falla en el primer intento.
+    
+    app.run_polling(allowed_updates=Update.ALL_TYPES, drop_pending_updates=True)
 
 
 if __name__ == "__main__":
