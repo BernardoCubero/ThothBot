@@ -120,6 +120,53 @@ nlu:
       - are you a human?
       - am I talking to a bot?
       - am I talking to a human?
+      - para que sirves
+      - para qué sirves
+      - que eres
+      - qué eres
+      - que haces
+      - qué haces
+      - cual es tu funcion
+      - cuál es tu función
+      - quien eres
+      - quién eres
+      - de que sirves
+      - de qué sirves
+      - para qué vales
+      - para que vales
+      - que puedes hacer
+      - qué puedes hacer
+      - que cosas haces
+      - qué cosas haces
+      - de que tratas
+      - de qué tratas
+      - que funcionalidad tienes
+      - qué funcionalidad tienes
+      - presentate
+      - preséntate
+      - cuéntame sobre ti
+      - cuentame sobre ti
+      - que eres tu
+      - qué eres tú
+      - para que sirve este bot
+      - para qué sirve este bot
+      - que hace este bot
+      - qué hace este bot
+      - de que es este bot
+      - de qué es este bot
+      - cual es el objetivo del bot
+      - cuál es el objetivo del bot
+      - en que me puedes ayudar
+      - en qué me puedes ayudar
+      - que ayuda me das
+      - qué ayuda me das
+      - cual es tu proposito
+      - cuál es tu propósito
+      - que servicios ofreces
+      - qué servicios ofreces
+      - what is your purpose
+      - what do you do
+      - who are you
 
   - intent: buscar_eventos
     examples: |

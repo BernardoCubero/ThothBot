@@ -224,7 +224,7 @@ def tiene_info_wikipedia(nombre, idioma="es", ciudad=None):
             "limit": 1,
             "format": "json",
         }
-        response = requests.get(url, params=params, headers=headers, timeout=2)
+        response = requests.get(url, params=params, headers=headers, timeout=1)
         data = response.json()
         # opensearch devuelve [query, [titulos], [descripciones], [urls]]
         titulos = data[1] if len(data) > 1 else []
@@ -345,6 +345,7 @@ class ActionBuscarMonumentos(Action):
         params = {
             "categories": "tourism.sights,heritage,building.historic,religion.place_of_worship",
             "filter": f"circle:{lon},{lat},8000",
+            "bias": f"proximity:{lon},{lat}",
             "limit": 100,
             "apiKey": API_KEY,
         }
@@ -353,16 +354,15 @@ class ActionBuscarMonumentos(Action):
             response = requests.get(url, params=params, timeout=10)
             data = response.json()
 
-            PRIORIDAD_WIKIDATA = []
-            SIN_WIKIDATA = []
-            
             ignorados = [
                 "homenaje", "estatua", "triunfo", "seminario", "historic centre", "centro histórico",
                 "pintura", "área expositiva", "zona arqueológica", "puerta", "calle", "avenida",
                 "glorieta", "rotonda", "monumento a", "mirador", "pináculo", "cruz del", "salam",
-                "douglas dc7", "guadalquivir"
+                "douglas dc7", "guadalquivir", "placa", "lápida", "busto", "in memoriam", "memorial", 
+                "sepultura", "tumba", "cenotafio"
             ]
             nombres_vistos = set()
+            candidatos = []
 
             for lugar in data.get("features", []):
                 props = lugar.get("properties", {})
@@ -375,28 +375,41 @@ class ActionBuscarMonumentos(Action):
                     
                 if any(ign in nombre.lower() for ign in ignorados):
                     continue
+                
+                # Filtro inteligente para omitir nombres de personas (típicamente placas o lápidas conmemorativas)
+                # que no sean monumentos reales. Un nombre de persona suele tener 3 o más palabras y no contener términos comunes de monumentos.
+                palabras = nombre.split()
+                if len(palabras) >= 3 and not any(p in nombre.lower() for p in [
+                    "palacio", "convento", "catedral", "iglesia", "monasterio", "castillo", "templo", 
+                    "basílica", "santuario", "ermita", "museo", "teatro", "palace", "cathedral", "church", 
+                    "castle", "museum", "plaza", "parque", "jardín", "puente", "puerta", "arco", "torre", "muralla", "casa"
+                ]):
+                    continue
                     
                 nombres_vistos.add(nombre.lower())
                 
+                categories = props.get("categories", [])
                 raw = props.get("datasource", {}).get("raw", {})
                 tiene_wikidata = bool(raw.get("wikidata") or raw.get("wikipedia"))
                 
+                # Puntuación de relevancia para ordenar los monumentos
+                score = 0
                 if tiene_wikidata:
-                    PRIORIDAD_WIKIDATA.append(nombre)
-                else:
-                    SIN_WIKIDATA.append(nombre)
-                    
-            CANDIDATOS_WIKI = []
-            if len(PRIORIDAD_WIKIDATA) < 10:
-                for n in SIN_WIKIDATA:
-                    if tiene_info_wikipedia(n, idioma, ciudad=ciudad):
-                        CANDIDATOS_WIKI.append(n)
-                    if len(PRIORIDAD_WIKIDATA) + len(CANDIDATOS_WIKI) >= 10:
-                        break
+                    score += 100  # Máxima prioridad para elementos con artículo/datos globales
+                if "tourism.sight" in categories or "tourism.sights" in categories:
+                    score += 50   # Alta prioridad para atracciones catalogadas como puntos de interés turístico
+                if "religion.place_of_worship" in categories:
+                    score += 20   # Prioridad media-alta para templos y lugares de culto (catedrales, iglesias históricas)
+                
+                # Penalización por distancia (en kilómetros) para favorecer los que están más en el centro turístico
+                distancia_km = props.get("distance", 0) / 1000.0
+                score -= distancia_km
+                
+                candidatos.append((score, nombre))
 
-            # Primero los que tienen wikidata, luego los validados via wikipedia
-            lugares = PRIORIDAD_WIKIDATA + CANDIDATOS_WIKI
-            lugares = lugares[:10]  # máximo 10 resultados
+            # Ordenar candidatos por puntuación de relevancia de mayor a menor
+            candidatos.sort(key=lambda x: x[0], reverse=True)
+            lugares = [c[1] for c in candidatos[:10]]
 
             if lugares:
                 respuesta = TEXTOS["action_buscar_monumentos"]["respuestas"][idioma]["resultado_exito"].format(ciudad=ciudad.capitalize())

@@ -51,3 +51,8 @@ rules:
   steps:
     - intent: info_monumento
     - action: action_info_monumento
+
+- rule: Responder a bot challenge
+  steps:
+    - intent: bot_challenge
+    - action: utter_bot_challenge

@@ -10,6 +10,10 @@ services:
     volumes:
       - ./models:/app/models
       - ./credentials.yml:/app/credentials.yml
+      - ./config.yml:/app/config.yml
+      - ./domain.yml:/app/domain.yml
+      - ./data:/app/data
+      - ./endpoints.yml:/app/endpoints.yml
     depends_on:
       - action_server
       - db
@@ -39,8 +43,10 @@ services:
     ports:
       - "5055:5055"
     volumes:
-      # Solo montamos la carpeta de acciones para hot-reload sin romper el contenedor
+      # Montamos carpetas de código para hot-reload sin romper el contenedor
       - ./actions:/app/actions
+      - ./database:/app/database
+      - ./services:/app/services
     env_file:
       - .env
     environment:
@@ -60,8 +66,8 @@ services:
     environment:
       MYSQL_ROOT_PASSWORD: ${MARIADB_PASSWORD}
       MYSQL_DATABASE: ${MARIADB_DB}
-    ports:
-      - "3307:3306"
+    # ports:
+    #   - "127.0.0.1:3307:3306" # Comentado por ciberseguridad: Aislamiento total de red. Comunicación interna vía thothbot-net.
     volumes:
       - mariadb_data:/var/lib/mysql
     networks:
@@ -72,8 +78,8 @@ services:
     image: mongo:latest
     container_name: thothbot-mongodb
     restart: always
-    ports:
-      - "27018:27017"
+    # ports:
+    #   - "127.0.0.1:27018:27017" # Comentado por ciberseguridad: Aislamiento total de red.
     volumes:
       - mongodb_data:/data/db
     networks:

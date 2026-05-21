@@ -106,8 +106,8 @@ responses:
     - text: "¿En qué ciudad estás interesado?"
 
   utter_bot_challenge:
-    - text: "Soy ThothBot, un asistente virtual. ¡No soy humano! 😊"
-    - text: "I'm ThothBot, a virtual assistant — not a human! 😊"
+    - text: "Soy ThothBot, un asistente virtual turístico. Estoy aquí para ayudarte a descubrir monumentos, buscar eventos y planificar tus visitas en distintas ciudades. ¡Dime qué ciudad te interesa!"
+    - text: "I'm ThothBot, a virtual tourist assistant. I'm here to help you discover monuments, find events, and plan your trips. Just tell me which city you want to visit!"
 
 
 #Acciones que usaran las Apis
