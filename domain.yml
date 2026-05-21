@@ -105,10 +105,6 @@ responses:
   utter_pedir_ciudad:
     - text: "¿En qué ciudad estás interesado?"
 
-  utter_bot_challenge:
-    - text: "Soy ThothBot, un asistente virtual turístico. Estoy aquí para ayudarte a descubrir monumentos, buscar eventos y planificar tus visitas en distintas ciudades. ¡Dime qué ciudad te interesa!"
-    - text: "I'm ThothBot, a virtual tourist assistant. I'm here to help you discover monuments, find events, and plan your trips. Just tell me which city you want to visit!"
-
 
 #Acciones que usaran las Apis
 
@@ -124,6 +120,7 @@ actions:
   - action_ask_nombre
   - action_ask_ciudad_origen
   - action_ask_pais
+  - action_bot_challenge
 
 session_config:
   session_expiration_time: 60

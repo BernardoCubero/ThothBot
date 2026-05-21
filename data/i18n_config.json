@@ -112,5 +112,15 @@
         "registro_completado": "Great, thanks for introducing yourself! I have saved your data. How can I help you today?"
       }
     }
+  },
+  "bot_challenge": {
+    "respuestas": {
+      "es": {
+        "intro": "Soy ThothBot, un asistente virtual turístico. Estoy aquí para ayudarte a descubrir monumentos, buscar eventos y planificar tus visitas en distintas ciudades. ¡Dime qué ciudad te interesa!"
+      },
+      "en": {
+        "intro": "I'm ThothBot, a virtual tourist assistant. I'm here to help you discover monuments, find events, and plan your trips. Just tell me which city you want to visit!"
+      }
+    }
   }
 }

@@ -55,4 +55,4 @@ rules:
 - rule: Responder a bot challenge
   steps:
     - intent: bot_challenge
-    - action: utter_bot_challenge
+    - action: action_bot_challenge

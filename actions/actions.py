@@ -382,7 +382,9 @@ class ActionBuscarMonumentos(Action):
                 if len(palabras) >= 3 and not any(p in nombre.lower() for p in [
                     "palacio", "convento", "catedral", "iglesia", "monasterio", "castillo", "templo", 
                     "basílica", "santuario", "ermita", "museo", "teatro", "palace", "cathedral", "church", 
-                    "castle", "museum", "plaza", "parque", "jardín", "puente", "puerta", "arco", "torre", "muralla", "casa"
+                    "castle", "museum", "plaza", "parque", "jardín", "puente", "puerta", "arco", "torre", 
+                    "muralla", "casa", "alcázar", "alcazar", "baños", "banos", "capilla", "sinagoga", 
+                    "romano", "ruinas", "yacimiento", "monumento"
                 ]):
                     continue
                     
@@ -396,10 +398,26 @@ class ActionBuscarMonumentos(Action):
                 score = 0
                 if tiene_wikidata:
                     score += 100  # Máxima prioridad para elementos con artículo/datos globales
-                if "tourism.sight" in categories or "tourism.sights" in categories:
-                    score += 50   # Alta prioridad para atracciones catalogadas como puntos de interés turístico
-                if "religion.place_of_worship" in categories:
-                    score += 20   # Prioridad media-alta para templos y lugares de culto (catedrales, iglesias históricas)
+                
+                # Búsqueda flexible en categorías usando coincidencias de prefijo
+                es_sight = any(c.startswith("tourism.sight") for c in categories)
+                es_attraction = "tourism.attraction" in categories
+                es_religion = any(c.startswith("religion.place_of_worship") for c in categories)
+                
+                if es_attraction:
+                    score += 80   # Gran prioridad para las atracciones turísticas catalogadas a nivel global
+                elif es_sight:
+                    score += 40   # Prioridad media para puntos de interés general
+                    
+                if es_religion:
+                    score += 10   # Aporte moderado para templos, permitiendo que castillos/mezquitas/sinagogas destaquen
+                
+                # Bonificación para términos ultra-icónicos de monumentos mayores
+                nombre_lower = nombre.lower()
+                if any(term in nombre_lower for term in [
+                    "mezquita", "catedral", "alcázar", "alcazar", "sinagoga", "castillo", "palacio", "teatro romano", "puente romano"
+                ]):
+                    score += 50
                 
                 # Penalización por distancia (en kilómetros) para favorecer los que están más en el centro turístico
                 distancia_km = props.get("distance", 0) / 1000.0
@@ -883,5 +901,16 @@ class ActionAskPais(Action):
         mensaje = tracker.latest_message.get("text") or ""
         idioma = detectar_idioma(mensaje.lower())
         respuesta = TEXTOS["action_registro"]["respuestas"][idioma]["ask_pais"]
+        dispatcher.utter_message(text=respuesta)
+        return []
+
+class ActionBotChallenge(Action):
+    def name(self):
+        return "action_bot_challenge"
+
+    def run(self, dispatcher, tracker, domain):
+        mensaje = tracker.latest_message.get("text") or ""
+        idioma = detectar_idioma(mensaje.lower())
+        respuesta = TEXTOS["bot_challenge"]["respuestas"][idioma]["intro"]
         dispatcher.utter_message(text=respuesta)
         return []

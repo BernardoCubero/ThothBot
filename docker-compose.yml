@@ -47,6 +47,7 @@ services:
       - ./actions:/app/actions
       - ./database:/app/database
       - ./services:/app/services
+      - ./data:/app/data
     env_file:
       - .env
     environment:
