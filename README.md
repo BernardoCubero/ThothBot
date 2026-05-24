@@ -174,11 +174,9 @@ venv/bin/python benchmark_carbon.py
 
 ## 🎓 Información Académica (TFG)
 
-* **Autor:** Bernardo Cubero
-* **Proyecto:** ThothBot - Asistente Conversacional Turístico Multi-Plataforma
-* **Tutor/es:** [Nombre del Tutor/es]
-* **Grado:** Ingeniería Informática
-* **Institución:** [Nombre de la Universidad]
+| 👤 **Autor** | 💡 **Proyecto** | 👨‍🏫 **Tutor** | 🏫 **Institución** | 📜 **Grado** |
+| :--- | :--- | :--- | :--- | :--- |
+| **Bernardo Cubero** | **ThothBot** - Asistente Conversacional Turístico | **Jose Antonio Agredano Parra** | **CES Lope de Vega** | Grado Superior de Desarrollo de Aplicaciones Multiplataforma (DAM) |
 
 ---
 
