@@ -26,18 +26,18 @@ graph TD
     Proxy -->|REST Webhook| Rasa["🧠 Rasa NLU & Core Server"]
     Rasa -->|HTTP Custom Actions| Actions["⚡ Custom Action Server"]
     
-    subgraph Capa de Datos
+    subgraph "Capa de Datos"
         Actions -->|Registro de Usuarios| MariaDB[("💾 MariaDB")]
         Actions -->|Logs e Historial de Chat| MongoDB[("🍃 MongoDB")]
     end
     
-    subgraph Integraciones Externas (APIs)
+    subgraph "Integraciones Externas (APIs)"
         Actions -->|Puntos de Interés Turístico| Geoapify["🌐 Geoapify Places API"]
         Actions -->|Artículos de Historia| Wikipedia["📖 Wikipedia API"]
         Actions -->|Eventos y Entradas| Ticketmaster["🎟️ Ticketmaster API"]
     end
     
-    subgraph Eficiencia Energética
+    subgraph "Eficiencia Energética"
         Actions -->|Auditoría de Sostenibilidad| CodeCarbon["🌱 CodeCarbon Tracker"]
     end
 ```

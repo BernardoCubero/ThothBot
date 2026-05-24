@@ -1,24 +1,42 @@
-# --- Entorno Virtual ---
-# No queremos subir las librerías instaladas, cada uno debe tener las suyas
+# --- Entornos Virtuales ---
+# No queremos subir las librerías instaladas
 venv/
 venv_rasa/
+venvls/
 ENV/
+.venv/
+.venvls/
 
 # --- Archivos de Rasa ---
-# Los modelos entrenados son archivos pesados (.tar.gz) y cambian siempre
+# Los modelos entrenados son archivos pesados (.tar.gz) y cambian en cada entrenamiento
 models/
-# Carpeta temporal de entrenamiento de Rasa
 .rasa/
 
-# --- Archivos de Sistema y PyCharm ---
+# --- Archivos de Base de Datos y Logs locales ---
+database/mariadb_data/
+database/mongo_data/
+*.log
+
+# --- Archivos de Configuración Local y Secretos ---
+.env
+.env.production
+credentials.yml
+
+# --- Archivos de Sistema y Editores ---
 .idea/
 .vscode/
 __pycache__/
 *.py[cod]
 .DS_Store
-.env
-# Backups locales
+*.swp
+
+# --- Backups locales ---
 backups/
 
-# Documentos internos (TFG)
+# --- Documentación Interna (TFG) ---
 docs/
+
+# --- Reportes y Logs Dinámicos de Sostenibilidad ---
+emissions.csv
+/actions/emissions.csv
+emissions_tracker/
