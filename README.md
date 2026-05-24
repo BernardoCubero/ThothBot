@@ -21,7 +21,7 @@ Este proyecto ha sido desarrollado como **Trabajo de Fin de Grado (TFG)**, desta
 El bot se despliega mediante **Docker Compose** en una red aislada compuesta por 5 microservicios coordinados:
 
 ```mermaid
-graph LR
+graph TD
     User(["📱 Usuario Telegram / Web"]) -->|Mensajes| Proxy["🐍 Telegram Proxy / Nginx"]
     Proxy -->|REST Webhook| Rasa["🧠 Rasa NLU & Core Server"]
     Rasa -->|Custom Actions| Actions["⚡ Custom Action Server"]
@@ -47,10 +47,6 @@ graph LR
     Actions -->|Historia| Wikipedia
     Actions -->|Eventos| Ticketmaster
     Actions -->|CO2 Tracker| CodeCarbon
-
-    %% Restricciones invisibles para forzar la alineación horizontal de los subgrafos
-    MariaDB ~~~ Geoapify
-    Geoapify ~~~ CodeCarbon
 
     %% Estilos de Clases Personalizados (Premium CSS)
     classDef default fill:#1e293b,stroke:#475569,stroke-width:1px,color:#f8fafc;
