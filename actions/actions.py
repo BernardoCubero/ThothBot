@@ -59,6 +59,37 @@ def ciudadNormalizada(texto):
         if unicodedata.category(c) != "Mn"
     )
     return texto
+def corregir_typos_ciudad(ciudad):
+    if not ciudad:
+        return ciudad
+    ciudad_norm = ciudadNormalizada(ciudad)
+    
+    # Mapeo directo de inglés y traducciones comunes
+    mapeo_ciudades = {
+        "seville": "sevilla",
+        "saragossa": "zaragoza",
+        "majorca": "mallorca",
+        "minorca": "menorca",
+        "alicant": "alicante"
+    }
+    if ciudad_norm in mapeo_ciudades:
+        return mapeo_ciudades[ciudad_norm]
+        
+    # Catálogo de ciudades de interés para auto-corregir typos
+    ciudades_conocidas = [
+        "sevilla", "madrid", "cordoba", "granada", "barcelona", 
+        "valencia", "bilbao", "malaga", "zaragoza", "toledo", 
+        "salamanca", "segovia", "burgos", "cadiz", "alicante",
+        "valladolid", "pedraza"
+    ]
+    
+    # Encontrar la coincidencia más cercana
+    coincidencias = get_close_matches(ciudad_norm, ciudades_conocidas, n=1, cutoff=0.68)
+    if coincidencias:
+        return coincidencias[0]
+        
+    return ciudad_norm
+
 
 
 def detectar_idioma(texto):
@@ -70,23 +101,22 @@ def detectar_idioma(texto):
         if f" {palabra} " in f" {texto} " or texto.startswith(f"{palabra} ") or texto.endswith(f" {palabra}") or texto == palabra:
             return "en"
     return "es"
-
-
 def extraer_ciudad_del_mensaje(tracker):
     # Prioriza entidad ciudad del ultimo mensaje para permitir cambiar de ciudad.
     entities = tracker.latest_message.get("entities") or []
     for entidad in entities:
         if entidad.get("entity") == "ciudad" and entidad.get("value"):
-            return entidad.get("value")
+            val = entidad.get("value")
+            if val and not val.strip().startswith("/"):
+                return val
 
     # Si el intent es solo ciudad, usar el texto completo como nuevo valor.
     intent = (tracker.latest_message.get("intent") or {}).get("name")
     texto = (tracker.latest_message.get("text") or "").strip()
-    if intent == "consultar_ciudad" and texto:
+    if intent == "consultar_ciudad" and texto and not texto.startswith("/"):
         return texto
 
     return None
-
 
 def buscar_en_wikipedia(monumento, idioma="es"):
     url = f"https://{idioma}.wikipedia.org/w/api.php"
@@ -302,7 +332,7 @@ class ActionBuscarMonumentos(Action):
                 ]
                 # Solo usamos la candidata si es distinta a la ciudad actual del slot,
                 # no es un número puro, no es una palabra ignorada, y tiene al menos 2 caracteres
-                if candidata and candidata not in palabras_ignoradas and candidata != (ciudad or "").lower() and not es_solo_numeros(candidata) and len(candidata) >= 2:
+                if candidata and candidata not in palabras_ignoradas and candidata != (ciudad or "").lower() and not es_solo_numeros(candidata) and len(candidata) >= 2 and not candidata.startswith("/"):
                     ciudad = candidata
 
         # fallback final si no hay ciudad de ningún modo
@@ -316,7 +346,7 @@ class ActionBuscarMonumentos(Action):
                     "eventos", "conciertos", "teatro", "deporte", "partido", "festival",
                     "musica", "actividades", "planes", "recomendaciones", "sugerencias"
                 ]
-                if candidata_final not in palabras_ignoradas and not es_solo_numeros(candidata_final) and len(candidata_final) >= 2:
+                if candidata_final not in palabras_ignoradas and not es_solo_numeros(candidata_final) and len(candidata_final) >= 2 and not candidata_final.startswith("/"):
                     ciudad = candidata_final
 
         # Evitar fallo si Mongo no funciona porque a veces me olvido de levantar el docker
@@ -332,6 +362,8 @@ class ActionBuscarMonumentos(Action):
             dispatcher.utter_message(text=TEXTOS["action_buscar_monumentos"]["respuestas"][idioma]["pedir_ciudad"])
             return []
 
+        ciudad = corregir_typos_ciudad(ciudad)
+
         #  obtener coordenadas dinámicamente
         lat, lon = obtener_coords(ciudad)
 
@@ -346,7 +378,7 @@ class ActionBuscarMonumentos(Action):
             "categories": "tourism.sights,heritage,building.historic,religion.place_of_worship",
             "filter": f"circle:{lon},{lat},8000",
             "bias": f"proximity:{lon},{lat}",
-            "limit": 100,
+            "limit": 500,
             "apiKey": API_KEY,
         }
 
@@ -356,7 +388,7 @@ class ActionBuscarMonumentos(Action):
 
             ignorados = [
                 "homenaje", "estatua", "triunfo", "seminario", "historic centre", "centro histórico",
-                "pintura", "área expositiva", "zona arqueológica", "puerta", "calle", "avenida",
+                "pintura", "área expositiva", "zona arqueológica", "calle", "avenida",
                 "glorieta", "rotonda", "monumento a", "mirador", "pináculo", "cruz del", "salam",
                 "douglas dc7", "guadalquivir", "placa", "lápida", "busto", "in memoriam", "memorial", 
                 "sepultura", "tumba", "cenotafio"
@@ -373,7 +405,28 @@ class ActionBuscarMonumentos(Action):
                 if nombre.lower() in nombres_vistos:
                     continue
                     
+                categories = props.get("categories", [])
+                
+                # Excluir de forma inteligente categorías menores de monumentos que inundan los cascos antiguos
+                exclude_cats = [
+                    "tourism.sights.memorial",
+                    "tourism.sights.statue",
+                    "tourism.attraction.artwork",
+                    "tourism.sights.information",
+                    "tourism.sights.map",
+                    "tourism.sights.signpost"
+                ]
+                if any(c in categories for c in exclude_cats):
+                    continue
+                    
                 if any(ign in nombre.lower() for ign in ignorados):
+                    continue
+                
+                # Filtrar puertas menores pero permitir monumentos históricos reales (Puerta de Alcalá, Jerez, del Sol, etc.)
+                nombre_lower = nombre.lower()
+                if "puerta" in nombre_lower and not any(p in nombre_lower for p in [
+                    "alcalá", "alcala", "jerez", "sol", "bisagra", "elvira", "serranos", "cuart", "toledo"
+                ]):
                     continue
                 
                 # Filtro inteligente para omitir nombres de personas (típicamente placas o lápidas conmemorativas)
@@ -390,7 +443,6 @@ class ActionBuscarMonumentos(Action):
                     
                 nombres_vistos.add(nombre.lower())
                 
-                categories = props.get("categories", [])
                 raw = props.get("datasource", {}).get("raw", {})
                 tiene_wikidata = bool(raw.get("wikidata") or raw.get("wikipedia"))
                 
@@ -413,11 +465,18 @@ class ActionBuscarMonumentos(Action):
                     score += 10   # Aporte moderado para templos, permitiendo que castillos/mezquitas/sinagogas destaquen
                 
                 # Bonificación para términos ultra-icónicos de monumentos mayores
-                nombre_lower = nombre.lower()
                 if any(term in nombre_lower for term in [
                     "mezquita", "catedral", "alcázar", "alcazar", "sinagoga", "castillo", "palacio", "teatro romano", "puente romano"
                 ]):
                     score += 50
+                
+                # Bonificación masiva para monumentos históricos de importancia mundial en España
+                if any(term in nombre_lower for term in [
+                    "real", "nacional", "prado", "alcalá", "alcala", "debod", "almudena", "viana", "reina sofía", 
+                    "reina sofia", "bellas artes", "giralda", "plaza de españa", "plaza de espana", "maría luisa", "maria luisa",
+                    "toro", "torre del oro"
+                ]):
+                    score += 100
                 
                 # Penalización por distancia (en kilómetros) para favorecer los que están más en el centro turístico
                 distancia_km = props.get("distance", 0) / 1000.0
@@ -473,7 +532,7 @@ class ActionBuscarEventos(Action):
                     "eventos", "conciertos", "teatro", "deporte", "partido", "festival",
                     "musica", "actividades", "planes", "recomendaciones", "sugerencias"
                 ]
-                if candidata and candidata not in palabras_ignoradas and candidata != (ciudad or "").lower() and not es_solo_numeros(candidata) and len(candidata) >= 2:
+                if candidata and candidata not in palabras_ignoradas and candidata != (ciudad or "").lower() and not es_solo_numeros(candidata) and len(candidata) >= 2 and not candidata.startswith("/"):
                     ciudad = candidata
 
         # fallback final si no hay ciudad de ningún modo
@@ -486,7 +545,7 @@ class ActionBuscarEventos(Action):
                     "eventos", "conciertos", "teatro", "deporte", "partido", "festival",
                     "musica", "actividades", "planes", "recomendaciones", "sugerencias"
                 ]
-                if candidata_final not in palabras_ignoradas and not es_solo_numeros(candidata_final) and len(candidata_final) >= 2:
+                if candidata_final not in palabras_ignoradas and not es_solo_numeros(candidata_final) and len(candidata_final) >= 2 and not candidata_final.startswith("/"):
                     ciudad = candidata_final
 
         mensaje = tracker.latest_message.get("text", "").lower()
@@ -496,22 +555,11 @@ class ActionBuscarEventos(Action):
             dispatcher.utter_message(text=TEXTOS["action_buscar_eventos"]["respuestas"][idioma]["pedir_ciudad_corta"])
             return []
             
-        ciudad = ciudadNormalizada(ciudad)
+        ciudad = corregir_typos_ciudad(ciudad)
 
         if not ciudad:
             dispatcher.utter_message(text=TEXTOS["action_buscar_eventos"]["respuestas"][idioma]["pedir_ciudad"])
             return []
-
-        # Mapeo de nombres en inglés a español para la API de Ticketmaster
-        mapeo_ciudades = {
-            "seville": "sevilla",
-            "saragossa": "zaragoza",
-            "majorca": "mallorca",
-            "minorca": "menorca",
-            "alicant": "alicante"
-        }
-        if ciudad in mapeo_ciudades:
-            ciudad = mapeo_ciudades[ciudad]
         
         # Determinar el tipo de evento basado en el mensaje
         classification = ""
@@ -640,7 +688,7 @@ class ActionRecomendarPlanes(Action):
             dispatcher.utter_message(text=TEXTOS["action_recomendar_planes"]["respuestas"][idioma]["pedir_ciudad"])
             return []
 
-        ciudad = ciudadNormalizada(ciudad)
+        ciudad = corregir_typos_ciudad(ciudad)
         if ciudad:
             recomendaciones = TEXTOS["action_recomendar_planes"]["recomendaciones"]
             if ciudad in recomendaciones:
@@ -733,7 +781,7 @@ class ActionInfoMonumento(Action):
         # geograficamente (ej: "Casa Puebla Badajoz" en vez de "Casa Puebla").
         # IMPORTANTE: no añadir ciudad si monumento ya la contiene o es la misma ciudad,
         # para evitar queries tipo "cordoba Cordoba" o "de cordoba Cordoba".
-        ciudad_ctx = tracker.get_slot("ciudad")
+        ciudad_ctx = corregir_typos_ciudad(tracker.get_slot("ciudad"))
         ciudad_ctx_norm = ciudadNormalizada(ciudad_ctx) if ciudad_ctx else ""
         monumento_norm = ciudadNormalizada(monumento)
         if ciudad_ctx and ciudad_ctx_norm not in monumento_norm:

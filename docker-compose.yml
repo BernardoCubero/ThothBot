@@ -14,6 +14,7 @@ services:
       - ./domain.yml:/app/domain.yml
       - ./data:/app/data
       - ./endpoints.yml:/app/endpoints.yml
+    restart: always
     depends_on:
       - action_server
       - db
@@ -26,7 +27,7 @@ services:
       context: ./telegram_proxy
       dockerfile: Dockerfile
     container_name: thothbot-telegram
-    restart: always
+    restart: "no"
     env_file:
       - .env
     environment:
@@ -53,6 +54,7 @@ services:
     environment:
       - MONGO_HOST=mongodb
       - MARIADB_HOST=db
+    restart: always
     depends_on:
       - db
       - mongodb
@@ -67,8 +69,8 @@ services:
     environment:
       MYSQL_ROOT_PASSWORD: ${MARIADB_PASSWORD}
       MYSQL_DATABASE: ${MARIADB_DB}
-    # ports:
-    #   - "127.0.0.1:3307:3306" # Comentado por ciberseguridad: Aislamiento total de red. Comunicación interna vía thothbot-net.
+    ports:
+      - "127.0.0.1:3307:3306" # Habilitado por seguridad: Aislamiento total de red externa, accesible solo vía Localhost / SSH Tunnel.
     volumes:
       - mariadb_data:/var/lib/mysql
     networks:
@@ -79,8 +81,8 @@ services:
     image: mongo:latest
     container_name: thothbot-mongodb
     restart: always
-    # ports:
-    #   - "127.0.0.1:27018:27017" # Comentado por ciberseguridad: Aislamiento total de red.
+    ports:
+      - "127.0.0.1:27017:27017"
     volumes:
       - mongodb_data:/data/db
     networks:

@@ -14,6 +14,7 @@ nlu:
       - hey there
       - good morning
       - good afternoon
+      - /start
 
   - intent: buscar_monumentos
     examples: |
