@@ -21,26 +21,57 @@ Este proyecto ha sido desarrollado como **Trabajo de Fin de Grado (TFG)**, desta
 El bot se despliega mediante **Docker Compose** en una red aislada compuesta por 5 microservicios coordinados:
 
 ```mermaid
-graph TD
-    User(["📱 Usuario Telegram / Web"]) -->|Chats/Comandos| Proxy["🐍 Telegram Proxy / Nginx"]
+graph LR
+    User(["📱 Usuario Telegram / Web"]) -->|Mensajes| Proxy["🐍 Telegram Proxy / Nginx"]
     Proxy -->|REST Webhook| Rasa["🧠 Rasa NLU & Core Server"]
-    Rasa -->|HTTP Custom Actions| Actions["⚡ Custom Action Server"]
+    Rasa -->|Custom Actions| Actions["⚡ Custom Action Server"]
     
     subgraph "Capa de Datos"
-        Actions -->|Registro de Usuarios| MariaDB[("💾 MariaDB")]
-        Actions -->|Logs e Historial de Chat| MongoDB[("🍃 MongoDB")]
+        MariaDB[("💾 MariaDB")]
+        MongoDB[("🍃 MongoDB")]
     end
     
-    subgraph "Integraciones Externas (APIs)"
-        Actions -->|Puntos de Interés Turístico| Geoapify["🌐 Geoapify Places API"]
-        Actions -->|Artículos de Historia| Wikipedia["📖 Wikipedia API"]
-        Actions -->|Eventos y Entradas| Ticketmaster["🎟️ Ticketmaster API"]
+    subgraph "APIs de Terceros"
+        Geoapify["🌐 Geoapify Places API"]
+        Wikipedia["📖 Wikipedia API"]
+        Ticketmaster["🎟️ Ticketmaster API"]
     end
     
-    subgraph "Eficiencia Energética"
-        Actions -->|Auditoría de Sostenibilidad| CodeCarbon["🌱 CodeCarbon Tracker"]
+    subgraph "Sostenibilidad"
+        CodeCarbon["🌱 CodeCarbon Tracker"]
     end
+
+    Actions -->|Registro| MariaDB
+    Actions -->|Logs| MongoDB
+    Actions -->|Monumentos| Geoapify
+    Actions -->|Historia| Wikipedia
+    Actions -->|Eventos| Ticketmaster
+    Actions -->|CO2 Tracker| CodeCarbon
+
+    %% Estilos de Clases Personalizados (Premium CSS)
+    classDef default fill:#1e293b,stroke:#475569,stroke-width:1px,color:#f8fafc;
+    classDef user fill:#1d4ed8,stroke:#3b82f6,stroke-width:2px,color:#ffffff,font-weight:bold;
+    classDef core fill:#6d28d9,stroke:#8b5cf6,stroke-width:2px,color:#ffffff,font-weight:bold;
+    classDef action fill:#be185d,stroke:#ec4899,stroke-width:2px,color:#ffffff,font-weight:bold;
+    classDef db fill:#047857,stroke:#10b981,stroke-width:2px,color:#ffffff;
+    classDef api fill:#0e7490,stroke:#06b6d4,stroke-width:2px,color:#ffffff;
+    classDef carbon fill:#15803d,stroke:#22c55e,stroke-width:2px,color:#ffffff,font-weight:bold;
+
+    class User user;
+    class Proxy,Rasa core;
+    class Actions action;
+    class MariaDB,MongoDB db;
+    class Geoapify,Wikipedia,Ticketmaster api;
+    class CodeCarbon carbon;
 ```
+
+> **Leyenda Visual de la Arquitectura:**
+> * 🔵 **Azul (Usuario):** Entrada directa desde canales interactivos.
+> * 🟣 **Violeta (Core):** Enrutamiento inteligente y procesamiento de lenguaje natural (NLP).
+> * 🔴 **Rosa/Fucsia (Acción):** Servidor lógico encargado de la orquestación e inferencia.
+> * 🟢 **Esmeralda (Datos):** Persistencia relacional y no relacional (MariaDB y MongoDB).
+> * 🟡 **Cian (Servicios):** Consultas externas dinámicas en tiempo real.
+> * 🌿 **Verde Bosque (Sostenibilidad):** Monitoreo activo de la huella de carbono.
 
 ---
 
