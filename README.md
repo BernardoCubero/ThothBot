@@ -1,3 +1,8 @@
+<p align="center">
+  <img src="assets/caratula.png" alt="Carátula de ThothBot" width="100%" max-width="800px" style="border-radius: 10px;">
+</p>
+
+
 # 🤖 ThothBot - Asistente Turístico Inteligente y Sostenible
 
 [![Rasa](https://img.shields.io/badge/Rasa-3.6.x-5A17EE.svg?style=for-the-badge&logo=rasa)](https://rasa.com/)
@@ -5,7 +10,7 @@
 [![Green Computing](https://img.shields.io/badge/Green_Computing-CodeCarbon-4CAF50.svg?style=for-the-badge&logo=eco)](https://codecarbon.io/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=for-the-badge)](https://opensource.org/licenses/MIT)
 
-**ThothBot** es un asistente conversacional (chatbot) inteligente y ecológicamente sostenible diseñado para guiar a turistas en tiempo real en cualquier ciudad del mundo. El bot permite registrar usuarios, buscar de forma inteligente monumentos principales (filtrando el ruido de placas menores), consultar eventos culturales y espectáculos a través de integraciones oficiales de API, y medir de forma transparente su huella de carbono.
+**ThothBot** es un asistente conversacional (chatbot) inteligente y ecológicamente sostenible diseñado para guiar a turistas en tiempo real en cualquier ciudad del mundo. El bot permite registrar usuarios, buscar de forma inteligente monumentos principales, consultar eventos culturales y espectáculos a través de integraciones oficiales de API, y medir de forma transparente su huella de carbono.
 
 Este proyecto ha sido desarrollado como **Trabajo de Fin de Grado (TFG)**, destacando por su arquitectura robusta de microservicios y su enfoque en **Green Computing (Sostenibilidad del Software)**.
 
@@ -14,6 +19,28 @@ Este proyecto ha sido desarrollado como **Trabajo de Fin de Grado (TFG)**, desta
 ## 🏛️ Arquitectura del Sistema (Multi-Contenedor)
 
 El bot se despliega mediante **Docker Compose** en una red aislada compuesta por 5 microservicios coordinados:
+
+```mermaid
+graph TD
+    User([📱 Usuario Telegram / Web]) -->|Chats/Comandos| Proxy[🐍 Telegram Proxy / Nginx]
+    Proxy -->|REST Webhook| Rasa[🧠 Rasa NLU & Core Server]
+    Rasa -->|HTTP Custom Actions| Actions[⚡ Custom Action Server]
+    
+    subgraph Capa de Datos
+        Actions -->|Registro de Usuarios| MariaDB[(💾 MariaDB)]
+        Actions -->|Logs e Historial de Chat| MongoDB[(🍃 MongoDB)]
+    end
+    
+    subgraph Integraciones Externas (APIs)
+        Actions -->|Puntos de Interés Turístico| Geoapify[🌐 Geoapify Places API]
+        Actions -->|Artículos de Historia| Wikipedia[📖 Wikipedia API]
+        Actions -->|Eventos y Entradas| Ticketmaster[🎟️ Ticketmaster API]
+    end
+    
+    subgraph Eficiencia Energética
+        Actions -->|Auditoría de Sostenibilidad| CodeCarbon[[🌱 CodeCarbon Tracker]]
+    end
+```
 
 ---
 
@@ -118,9 +145,9 @@ venv/bin/python benchmark_carbon.py
 
 * **Autor:** Bernardo Cubero
 * **Proyecto:** ThothBot - Asistente Conversacional Turístico Multi-Plataforma
-* **Tutor/es:** Jose Antonio Agredano Parra
-* **Grado:** Grado Superior de Aplicaciones Multiplataforma
-* **Institución:** CES Lope de Vega
+* **Tutor/es:** [Nombre del Tutor/es]
+* **Grado:** Ingeniería Informática
+* **Institución:** [Nombre de la Universidad]
 
 ---
 
