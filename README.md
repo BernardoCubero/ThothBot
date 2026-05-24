@@ -48,6 +48,10 @@ graph LR
     Actions -->|Eventos| Ticketmaster
     Actions -->|CO2 Tracker| CodeCarbon
 
+    %% Restricciones invisibles para forzar la alineación horizontal de los subgrafos
+    MariaDB ~~~ Geoapify
+    Geoapify ~~~ CodeCarbon
+
     %% Estilos de Clases Personalizados (Premium CSS)
     classDef default fill:#1e293b,stroke:#475569,stroke-width:1px,color:#f8fafc;
     classDef user fill:#1d4ed8,stroke:#3b82f6,stroke-width:2px,color:#ffffff,font-weight:bold;
