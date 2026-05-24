@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="assets/caratula.png" alt="Carátula de ThothBot" width="100%" max-width="800px" style="border-radius: 10px;">
+  <img src="assets/thothbot.png" alt="Carátula de ThothBot" width="100%" max-width="800px" style="border-radius: 10px;">
 </p>
 
 
@@ -22,23 +22,23 @@ El bot se despliega mediante **Docker Compose** en una red aislada compuesta por
 
 ```mermaid
 graph TD
-    User([📱 Usuario Telegram / Web]) -->|Chats/Comandos| Proxy[🐍 Telegram Proxy / Nginx]
-    Proxy -->|REST Webhook| Rasa[🧠 Rasa NLU & Core Server]
-    Rasa -->|HTTP Custom Actions| Actions[⚡ Custom Action Server]
+    User(["📱 Usuario Telegram / Web"]) -->|Chats/Comandos| Proxy["🐍 Telegram Proxy / Nginx"]
+    Proxy -->|REST Webhook| Rasa["🧠 Rasa NLU & Core Server"]
+    Rasa -->|HTTP Custom Actions| Actions["⚡ Custom Action Server"]
     
     subgraph Capa de Datos
-        Actions -->|Registro de Usuarios| MariaDB[(💾 MariaDB)]
-        Actions -->|Logs e Historial de Chat| MongoDB[(🍃 MongoDB)]
+        Actions -->|Registro de Usuarios| MariaDB[("💾 MariaDB")]
+        Actions -->|Logs e Historial de Chat| MongoDB[("🍃 MongoDB")]
     end
     
     subgraph Integraciones Externas (APIs)
-        Actions -->|Puntos de Interés Turístico| Geoapify[🌐 Geoapify Places API]
-        Actions -->|Artículos de Historia| Wikipedia[📖 Wikipedia API]
-        Actions -->|Eventos y Entradas| Ticketmaster[🎟️ Ticketmaster API]
+        Actions -->|Puntos de Interés Turístico| Geoapify["🌐 Geoapify Places API"]
+        Actions -->|Artículos de Historia| Wikipedia["📖 Wikipedia API"]
+        Actions -->|Eventos y Entradas| Ticketmaster["🎟️ Ticketmaster API"]
     end
     
     subgraph Eficiencia Energética
-        Actions -->|Auditoría de Sostenibilidad| CodeCarbon[[🌱 CodeCarbon Tracker]]
+        Actions -->|Auditoría de Sostenibilidad| CodeCarbon["🌱 CodeCarbon Tracker"]
     end
 ```
 
