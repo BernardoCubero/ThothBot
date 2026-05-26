@@ -46,6 +46,10 @@ slots:
     type: bool
     mappings:
       - type: custom
+  tipo_busqueda:
+    type: text
+    mappings:
+      - type: custom
   nombre:
     type: text
     mappings:
@@ -121,6 +125,7 @@ actions:
   - action_ask_ciudad_origen
   - action_ask_pais
   - action_bot_challenge
+  - action_procesar_ciudad
 
 session_config:
   session_expiration_time: 60

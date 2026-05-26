@@ -360,7 +360,7 @@ class ActionBuscarMonumentos(Action):
         #  si no hay ciudad
         if not ciudad:
             dispatcher.utter_message(text=TEXTOS["action_buscar_monumentos"]["respuestas"][idioma]["pedir_ciudad"])
-            return []
+            return [SlotSet("tipo_busqueda", "monumentos")]
 
         ciudad = corregir_typos_ciudad(ciudad)
 
@@ -501,7 +501,7 @@ class ActionBuscarMonumentos(Action):
             dispatcher.utter_message(text=TEXTOS["action_buscar_monumentos"]["respuestas"][idioma]["error_api"])
             print(f"[ERROR ActionBuscarMonumentos] tipo={type(e).__name__} detalle={e}")
 
-        return [SlotSet("ciudad", ciudad)]
+        return [SlotSet("ciudad", ciudad), SlotSet("tipo_busqueda", "monumentos")]
 
 
 class ActionBuscarEventos(Action):
@@ -553,13 +553,13 @@ class ActionBuscarEventos(Action):
 
         if not ciudad:
             dispatcher.utter_message(text=TEXTOS["action_buscar_eventos"]["respuestas"][idioma]["pedir_ciudad_corta"])
-            return []
+            return [SlotSet("tipo_busqueda", "eventos")]
             
         ciudad = corregir_typos_ciudad(ciudad)
 
         if not ciudad:
             dispatcher.utter_message(text=TEXTOS["action_buscar_eventos"]["respuestas"][idioma]["pedir_ciudad"])
-            return []
+            return [SlotSet("tipo_busqueda", "eventos")]
         
         # Determinar el tipo de evento basado en el mensaje
         classification = ""
@@ -644,7 +644,7 @@ class ActionBuscarEventos(Action):
             dispatcher.utter_message(text=TEXTOS["action_buscar_eventos"]["respuestas"][idioma]["error_conexion"])
             print("Error Exception Ticketmaster:", e)
 
-        return [SlotSet("ciudad", ciudad)]
+        return [SlotSet("ciudad", ciudad), SlotSet("tipo_busqueda", "eventos")]
 
 
 class ActionRecomendarPlanes(Action):
@@ -686,7 +686,7 @@ class ActionRecomendarPlanes(Action):
 
         if not ciudad:
             dispatcher.utter_message(text=TEXTOS["action_recomendar_planes"]["respuestas"][idioma]["pedir_ciudad"])
-            return []
+            return [SlotSet("tipo_busqueda", "planes")]
 
         ciudad = corregir_typos_ciudad(ciudad)
         if ciudad:
@@ -701,7 +701,8 @@ class ActionRecomendarPlanes(Action):
                 dispatcher.utter_message(text=TEXTOS["action_recomendar_planes"]["respuestas"][idioma]["no_recomendaciones"])
         else:
             dispatcher.utter_message(text=TEXTOS["action_recomendar_planes"]["respuestas"][idioma]["pedir_ciudad"])
-        return [SlotSet("ciudad", ciudad)]
+            return [SlotSet("tipo_busqueda", "planes")]
+        return [SlotSet("ciudad", ciudad), SlotSet("tipo_busqueda", "planes")]
 
 
 class ActionInfoMonumento(Action):
@@ -800,16 +801,30 @@ class ActionInfoMonumento(Action):
             if m_n == t_n:
                 return True
             # El título debe EMPEZAR con el query o viceversa.
-            # Evita falsos positivos como "cordoba" → "Villanueva de Córdoba"
-            # ("cordoba" aparece al final, no al inicio del título)
             if t_n.startswith(m_n) or m_n.startswith(t_n):
                 return True
+                
+            # Validacion estricta por palabras para evitar falsos positivos
+            m_w = {w for w in m_n.replace("-", " ").split() if w not in {"de", "la", "el", "del", "en", "a", "of", "the", "in", "and"}}
+            t_w = {w for w in t_n.replace("-", " ").split() if w not in {"de", "la", "el", "del", "en", "a", "of", "the", "in", "and"}}
+            
+            if m_w and t_w:
+                overlap = m_w.intersection(t_w)
+                overlap_ratio = len(overlap) / min(len(m_w), len(t_w))
+                
+                # Si todas las palabras significativas coinciden
+                if overlap_ratio >= 1.0:
+                    return True
+                    
+                from difflib import SequenceMatcher
+                seq_ratio = SequenceMatcher(None, m_n, t_n).ratio()
+                
+                # Exigir un buen solapamiento de palabras Y buena secuencia, o una secuencia casi perfecta
+                # Esto rechaza 'catedral segovia' vs 'andres segovia' (overlap=0.5, seq=0.73)
+                return (overlap_ratio >= 0.5 and seq_ratio >= 0.80) or seq_ratio >= 0.90
+            
             from difflib import SequenceMatcher
-            # Umbral 0.65: cubre monumentos con nombres compuestos
-            # ej: "mezquita cordoba" (ratio ~0.68) ↔ "Mezquita-Catedral de Córdoba"
-            # pero rechaza "de cordoba" (ratio ~0.60) ↔ "Villaviciosa de Córdoba"
-            # El main bug ("de cordoba") ya está solucionado por stopwords_extra que elimina "de".
-            return SequenceMatcher(None, m_n, t_n).ratio() >= 0.65
+            return SequenceMatcher(None, m_n, t_n).ratio() >= 0.85
 
         # Validación: Evitar falsos positivos si el título devuelto es completamente distinto.
         if titulo and not es_match_valido(monumento, titulo):
@@ -962,3 +977,30 @@ class ActionBotChallenge(Action):
         respuesta = TEXTOS["bot_challenge"]["respuestas"][idioma]["intro"]
         dispatcher.utter_message(text=respuesta)
         return []
+
+class ActionProcesarCiudad(Action):
+    def name(self):
+        return "action_procesar_ciudad"
+
+    def run(self, dispatcher, tracker, domain):
+        tipo_busqueda = tracker.get_slot("tipo_busqueda")
+        ciudad = extraer_ciudad_del_mensaje(tracker)
+        
+        if not ciudad:
+            texto_msg = tracker.latest_message.get("text") or ""
+            palabras = texto_msg.split()
+            if palabras:
+                ciudad = palabras[-1].lower().strip().rstrip(".,!?")
+                
+        events = []
+        if ciudad:
+            events.append(SlotSet("ciudad", ciudad))
+            
+        if tipo_busqueda == "eventos":
+            events.append(FollowupAction("action_buscar_eventos"))
+        elif tipo_busqueda == "planes":
+            events.append(FollowupAction("action_recomendar_planes"))
+        else:
+            events.append(FollowupAction("action_buscar_monumentos"))
+            
+        return events

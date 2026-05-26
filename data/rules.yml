@@ -23,11 +23,11 @@ rules:
     - intent: despedida
     - action: utter_despedida
 
-# CLAVE: ciudad sola → monumentos
-- rule: ciudad sola devuelve monumentos
+# CLAVE: ciudad sola → monumentos o eventos según contexto
+- rule: ciudad sola procesa segun contexto
   steps:
     - intent: consultar_ciudad
-    - action: action_buscar_monumentos
+    - action: action_procesar_ciudad
 
 # usar slot para eventos
 - rule: buscar eventos con o sin ciudad
