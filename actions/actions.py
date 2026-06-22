@@ -1,9 +1,7 @@
-import unicodedata
 from rasa_sdk.events import FollowupAction
 from actions.db.mongo_logger import guardar_log, guardar_error
 from rasa_sdk import Action
 from rasa_sdk.events import SlotSet
-from difflib import get_close_matches
 from dotenv import load_dotenv
 import os
 import requests
@@ -11,269 +9,18 @@ import urllib.parse
 import json
 from services.user_service import guardar_o_actualizar_usuario, obtener_usuario
 
+from actions.utils.i18n import TEXTOS
+from actions.utils.text_utils import es_solo_numeros, ciudadNormalizada, corregir_typos_ciudad, detectar_idioma
+from actions.utils.rasa_utils import extraer_ciudad_del_mensaje
+
+from actions.services.api_geoapify import obtener_coords, buscar_lugares_cercanos\nfrom actions.services.api_ticketmaster import buscar_eventos
+from actions.services.api_wikipedia import buscar_en_wikipedia, obtener_resumen_wikipedia, tiene_info_wikipedia
+from actions.services.api_translation import traducir_es_en
+
 # Gestion de Claves Api
 load_dotenv()
 API_KEY = os.getenv("GEOAPIFY_API_KEY")
 TK_API_KEY = os.getenv("TKMASTER")
-
-def cargar_i18n():
-    # Separo la carga del json para que quede mas limpio, lo vi en un tutorial de youtube
-    import os
-    ruta = os.path.join(os.path.dirname(__file__), '..', 'data', 'i18n_config.json')
-    with open(ruta, 'r', encoding='utf-8') as f:
-        return json.load(f)
-
-TEXTOS = cargar_i18n()
-
-
-def es_solo_numeros(texto):
-    """Devuelve True si el texto es un número puro (ej: '123', '3')."""
-    return texto.strip().lstrip('+-').replace('.', '', 1).isdigit()
-
-
-def obtener_coords(ciudad):
-    url = "https://api.geoapify.com/v1/geocode/search"
-
-    params = {"text": ciudad + ", Spain", "limit": 1, "apiKey": API_KEY}
-
-    try:
-        response = requests.get(url, params=params, timeout=4)
-        data = response.json()
-    except requests.RequestException:
-        return None, None
-
-    if data.get("features"):
-        coords = data["features"][0]["geometry"]["coordinates"]
-        lon, lat = coords
-        return lat, lon
-
-    return None, None
-
-
-def ciudadNormalizada(texto):
-    texto = texto.lower()
-    texto = texto.strip()
-    texto = "".join(
-        c
-        for c in unicodedata.normalize("NFD", texto)
-        if unicodedata.category(c) != "Mn"
-    )
-    return texto
-def corregir_typos_ciudad(ciudad):
-    if not ciudad:
-        return ciudad
-    ciudad_norm = ciudadNormalizada(ciudad)
-    
-    # Mapeo directo de inglés y traducciones comunes
-    mapeo_ciudades = {
-        "seville": "sevilla",
-        "saragossa": "zaragoza",
-        "majorca": "mallorca",
-        "minorca": "menorca",
-        "alicant": "alicante"
-    }
-    if ciudad_norm in mapeo_ciudades:
-        return mapeo_ciudades[ciudad_norm]
-        
-    # Catálogo de ciudades de interés para auto-corregir typos
-    ciudades_conocidas = [
-        "sevilla", "madrid", "cordoba", "granada", "barcelona", 
-        "valencia", "bilbao", "malaga", "zaragoza", "toledo", 
-        "salamanca", "segovia", "burgos", "cadiz", "alicante",
-        "valladolid", "pedraza"
-    ]
-    
-    # Encontrar la coincidencia más cercana
-    coincidencias = get_close_matches(ciudad_norm, ciudades_conocidas, n=1, cutoff=0.68)
-    if coincidencias:
-        return coincidencias[0]
-        
-    return ciudad_norm
-
-
-
-def detectar_idioma(texto):
-    if not texto:
-        return "es"
-    texto = texto.lower()
-    palabras_ingles = TEXTOS["deteccion_idioma"]["palabras_clave_en"]
-    for palabra in palabras_ingles:
-        if f" {palabra} " in f" {texto} " or texto.startswith(f"{palabra} ") or texto.endswith(f" {palabra}") or texto == palabra:
-            return "en"
-    return "es"
-def extraer_ciudad_del_mensaje(tracker):
-    # Prioriza entidad ciudad del ultimo mensaje para permitir cambiar de ciudad.
-    entities = tracker.latest_message.get("entities") or []
-    for entidad in entities:
-        if entidad.get("entity") == "ciudad" and entidad.get("value"):
-            val = entidad.get("value")
-            if val and not val.strip().startswith("/"):
-                return val
-
-    # Si el intent es solo ciudad, usar el texto completo como nuevo valor.
-    intent = (tracker.latest_message.get("intent") or {}).get("name")
-    texto = (tracker.latest_message.get("text") or "").strip()
-    if intent == "consultar_ciudad" and texto and not texto.startswith("/"):
-        return texto
-
-    return None
-
-def buscar_en_wikipedia(monumento, idioma="es"):
-    url = f"https://{idioma}.wikipedia.org/w/api.php"
-    # IMPORTANTE: Wikipedia bloqueaba las llamadas y daba error 403, me volvi loco buscando en google. 
-    # Hay que poner el User-Agent si o si para que sepan que es un proyecto
-    headers = {"User-Agent": "ThothBot/1.0 (proyecto TFG)"}
-
-    params = {
-        "action": "query",
-        "list": "search",
-        "srsearch": monumento,
-        "format": "json",
-        "srlimit": 1,
-    }
-
-    # CAMBIO: peticion robusta con timeout y control de errores de red.
-    try:
-        response = requests.get(url, params=params, headers=headers, timeout=4)
-    except requests.RequestException as e:
-        print("ERROR Wikipedia search:", e)
-        guardar_error("Wikipedia Search", "Error de red al buscar en Wikipedia", e)
-        return None
-
-    if response.status_code != 200:
-        return None
-
-    # CAMBIO: proteger parseo JSON para no romper la accion con respuestas invalidas.
-    try:
-        data = response.json()
-    except ValueError:
-        return None
-
-    resultados = data.get("query", {}).get("search", [])
-
-    if resultados:
-        titulo = resultados[0]["title"]
-        return titulo  # Ej: "Mezquita-Catedral de Córdoba"
-
-    return None
-
-
-def traducir_es_en(texto):
-    try:
-        url = "https://api.mymemory.translated.net/get"
-        params = {"q": texto, "langpair": "es|en"}
-        r = requests.get(url, params=params, timeout=3)
-        if r.status_code == 200:
-            tr = r.json().get("responseData", {}).get("translatedText")
-            if tr:
-                return tr
-    except:
-        pass
-    return texto
-
-def obtener_resumen_wikipedia(titulo, idioma="es", idioma_ui=None):
-    if idioma_ui is None:
-        idioma_ui = idioma
-    titulo_encoded = urllib.parse.quote(titulo.replace(" ", "_"))
-    url = f"https://{idioma}.wikipedia.org/api/rest_v1/page/summary/{titulo_encoded}"
-
-    # CAMBIO: mantener User-Agent tambien en endpoint REST de resumen.
-    headers = {"User-Agent": "ThothBot/1.0 (proyecto TFG)"}
-
-    try:
-        response = requests.get(url, headers=headers, timeout=4)
-
-        if response.status_code != 200 or not response.text:
-            return None
-
-        data = response.json()
-
-        # CAMBIO: Rechazar páginas de desambiguación de Wikipedia.
-        # La API REST devuelve type="disambiguation" para estas páginas.
-        # Además se comprueba la descripción por si el campo type no está presente.
-        tipo_pagina = data.get("type", "")
-        descripcion = data.get("description", "")
-        terminos_disambig = ["desambiguación", "disambiguation", "wikimedia disambiguation"]
-        if tipo_pagina == "disambiguation" or any(t in descripcion.lower() for t in terminos_disambig):
-            print(f"[Wikipedia] Rechazada página de desambiguación: '{data.get('title', titulo)}'")
-            guardar_error("Wikipedia Summary", "Pagina de desambiguacion rechazada", data.get('title', titulo))
-            return None
-
-        extract = data.get("extract", "")
-        link = data.get("content_urls", {}).get("desktop", {}).get("page", "")
-
-        # Recortar extract a máximo 3 frases
-        frases = extract.split(". ")
-        resumen_corto = ". ".join(frases[:3]).strip()
-        if resumen_corto and not resumen_corto.endswith("."):
-            resumen_corto += "."
-
-        if not resumen_corto:
-            return None
-
-        if idioma == "es" and idioma_ui == "en":
-            if descripcion:
-                descripcion = traducir_es_en(descripcion[:450])
-            if resumen_corto:
-                resumen_corto = traducir_es_en(resumen_corto[:450])
-
-        resultado = f" *{titulo}*"
-        if descripcion:
-            resultado += f"\n_{descripcion}_"
-        resultado += f"\n\n{resumen_corto}"
-        if link:
-            if idioma_ui == "en":
-                resultado += f"\n\nMore info: {link}"
-            else:
-                resultado += f"\n\nMás info: {link}"
-
-        return resultado
-
-    except Exception as e:
-        # TODO: Mejorar este print porque a veces sale en consola y asusta
-        print("ERROR Wikipedia summary:", e)
-        guardar_error("Wikipedia Summary", "Error al obtener resumen REST", e)
-        return None
-
-
-def tiene_info_wikipedia(nombre, idioma="es", ciudad=None):
-    """
-    Comprueba rapidamente si un monumento tiene articulo valido en Wikipedia.
-    Usa opensearch con el nombre exacto (sin ciudad) porque opensearch no
-    soporta consultas compuestas y devuelve [] si hay palabras extra.
-    Si se encuentra titulo, se valida similitud con difflib.
-    Si el resultado es una disambiguation page, se descarta.
-    """
-    try:
-        url = f"https://{idioma}.wikipedia.org/w/api.php"
-        headers = {"User-Agent": "ThothBot/1.0 (proyecto TFG)"}
-        # IMPORTANTE: NO añadir ciudad al query de opensearch.
-        # opensearch es muy literal y devuelve [] si el query no encaja exacto
-        # con el título del artículo. La ciudad se usaba antes pero rompía
-        # monumentos famosos como "Sagrada Família barcelona" → sin resultados.
-        params = {
-            "action": "opensearch",
-            "search": nombre,
-            "limit": 1,
-            "format": "json",
-        }
-        response = requests.get(url, params=params, headers=headers, timeout=1)
-        data = response.json()
-        # opensearch devuelve [query, [titulos], [descripciones], [urls]]
-        titulos = data[1] if len(data) > 1 else []
-        descripciones = data[2] if len(data) > 2 else []
-        if titulos:
-            titulo = titulos[0]
-            descripcion_resultado = descripciones[0].lower() if descripciones else ""
-            # Descartar páginas de desambiguación
-            terminos_disambig = ["desambiguación", "disambiguation"]
-            if any(t in descripcion_resultado for t in terminos_disambig):
-                return False
-            if get_close_matches(nombre.lower(), [titulo.lower()], cutoff=0.5):
-                return True
-    except Exception:
-        pass
-    return False
 
 
 class ActionBuscarMonumentos(Action):
@@ -376,121 +123,8 @@ class ActionBuscarMonumentos(Action):
             return []
 
         # llamada a Geoapify
-        url = "https://api.geoapify.com/v2/places"
-
-        params = {
-            "categories": "tourism.sights,heritage,building.historic,religion.place_of_worship",
-            "filter": f"circle:{lon},{lat},8000",
-            "bias": f"proximity:{lon},{lat}",
-            "limit": 500,
-            "apiKey": API_KEY,
-        }
-
-        try:
-            response = requests.get(url, params=params, timeout=10)
-            data = response.json()
-
-            ignorados = [
-                "homenaje", "estatua", "triunfo", "seminario", "historic centre", "centro histórico",
-                "pintura", "área expositiva", "zona arqueológica", "calle", "avenida",
-                "glorieta", "rotonda", "monumento a", "mirador", "pináculo", "cruz del", "salam",
-                "douglas dc7", "guadalquivir", "placa", "lápida", "busto", "in memoriam", "memorial", 
-                "sepultura", "tumba", "cenotafio"
-            ]
-            nombres_vistos = set()
-            candidatos = []
-
-            for lugar in data.get("features", []):
-                props = lugar.get("properties", {})
-                nombre = props.get("name")
-                if not nombre:
-                    continue
-                
-                if nombre.lower() in nombres_vistos:
-                    continue
-                    
-                categories = props.get("categories", [])
-                
-                # Excluir de forma inteligente categorías menores de monumentos que inundan los cascos antiguos
-                exclude_cats = [
-                    "tourism.sights.memorial",
-                    "tourism.sights.statue",
-                    "tourism.attraction.artwork",
-                    "tourism.sights.information",
-                    "tourism.sights.map",
-                    "tourism.sights.signpost"
-                ]
-                if any(c in categories for c in exclude_cats):
-                    continue
-                    
-                if any(ign in nombre.lower() for ign in ignorados):
-                    continue
-                
-                # Filtrar puertas menores pero permitir monumentos históricos reales (Puerta de Alcalá, Jerez, del Sol, etc.)
-                nombre_lower = nombre.lower()
-                if "puerta" in nombre_lower and not any(p in nombre_lower for p in [
-                    "alcalá", "alcala", "jerez", "sol", "bisagra", "elvira", "serranos", "cuart", "toledo"
-                ]):
-                    continue
-                
-                # Filtro inteligente para omitir nombres de personas (típicamente placas o lápidas conmemorativas)
-                # que no sean monumentos reales. Un nombre de persona suele tener 3 o más palabras y no contener términos comunes de monumentos.
-                palabras = nombre.split()
-                if len(palabras) >= 3 and not any(p in nombre.lower() for p in [
-                    "palacio", "convento", "catedral", "iglesia", "monasterio", "castillo", "templo", 
-                    "basílica", "santuario", "ermita", "museo", "teatro", "palace", "cathedral", "church", 
-                    "castle", "museum", "plaza", "parque", "jardín", "puente", "puerta", "arco", "torre", 
-                    "muralla", "casa", "alcázar", "alcazar", "baños", "banos", "capilla", "sinagoga", 
-                    "romano", "ruinas", "yacimiento", "monumento"
-                ]):
-                    continue
-                    
-                nombres_vistos.add(nombre.lower())
-                
-                raw = props.get("datasource", {}).get("raw", {})
-                tiene_wikidata = bool(raw.get("wikidata") or raw.get("wikipedia"))
-                
-                # Puntuación de relevancia para ordenar los monumentos
-                score = 0
-                if tiene_wikidata:
-                    score += 100  # Máxima prioridad para elementos con artículo/datos globales
-                
-                # Búsqueda flexible en categorías usando coincidencias de prefijo
-                es_sight = any(c.startswith("tourism.sight") for c in categories)
-                es_attraction = "tourism.attraction" in categories
-                es_religion = any(c.startswith("religion.place_of_worship") for c in categories)
-                
-                if es_attraction:
-                    score += 80   # Gran prioridad para las atracciones turísticas catalogadas a nivel global
-                elif es_sight:
-                    score += 40   # Prioridad media para puntos de interés general
-                    
-                if es_religion:
-                    score += 10   # Aporte moderado para templos, permitiendo que castillos/mezquitas/sinagogas destaquen
-                
-                # Bonificación para términos ultra-icónicos de monumentos mayores
-                if any(term in nombre_lower for term in [
-                    "mezquita", "catedral", "alcázar", "alcazar", "sinagoga", "castillo", "palacio", "teatro romano", "puente romano"
-                ]):
-                    score += 50
-                
-                # Bonificación masiva para monumentos históricos de importancia mundial en España
-                if any(term in nombre_lower for term in [
-                    "real", "nacional", "prado", "alcalá", "alcala", "debod", "almudena", "viana", "reina sofía", 
-                    "reina sofia", "bellas artes", "giralda", "plaza de españa", "plaza de espana", "maría luisa", "maria luisa",
-                    "toro", "torre del oro"
-                ]):
-                    score += 100
-                
-                # Penalización por distancia (en kilómetros) para favorecer los que están más en el centro turístico
-                distancia_km = props.get("distance", 0) / 1000.0
-                score -= distancia_km
-                
-                candidatos.append((score, nombre))
-
-            # Ordenar candidatos por puntuación de relevancia de mayor a menor
-            candidatos.sort(key=lambda x: x[0], reverse=True)
-            lugares = [c[1] for c in candidatos[:10]]
+                try:
+            lugares = buscar_lugares_cercanos(lat, lon)
 
             if lugares:
                 respuesta = TEXTOS["action_buscar_monumentos"]["respuestas"][idioma]["resultado_exito"].format(ciudad=ciudad.capitalize())
@@ -575,81 +209,34 @@ class ActionBuscarEventos(Action):
         elif "deporte" in mensaje or "partido" in mensaje:
             classification = "Sports"
 
-        url = "https://app.ticketmaster.com/discovery/v2/events.json"
-        params = {
-            "apikey": TK_API_KEY,
-            "countryCode": "ES",
-            "city": ciudad,
-            "size": 5,
-            "sort": "date,asc"
-        }
-        
-        if classification:
-            params["classificationName"] = classification
-
-        try:
-            response = requests.get(url, params=params, timeout=5)
-
-            if response.status_code == 200:
-                data = response.json()
-                eventos_encontrados = data.get("_embedded", {}).get("events", [])
-                
-                if eventos_encontrados:
+                try:
+            eventos = buscar_eventos(ciudad, classification)
+            if eventos is not None:
+                if eventos:
                     respuesta = TEXTOS["action_buscar_eventos"]["respuestas"][idioma]["resultado_exito"].format(ciudad=ciudad.capitalize())
                     enlace_texto = TEXTOS["action_buscar_eventos"]["respuestas"][idioma]["enlace_entradas"]
-
-                    for evento in eventos_encontrados:
-                        nombre = evento.get("name", "Evento sin nombre")
-                        url_evento = evento.get("url", "")
-
-                        # Fecha y hora del evento
-                        fechas = evento.get("dates", {}).get("start", {})
-                        fecha = fechas.get("localDate", "")   # ej: "2025-06-14"
-                        hora  = fechas.get("localTime", "")   # ej: "20:00:00"
-                        fecha_fmt = ""
-                        if fecha:
-                            partes = fecha.split("-")
-                            if len(partes) == 3:
-                                fecha_fmt = f"{partes[2]}/{partes[1]}/{partes[0]}"
-                        if hora:
-                            fecha_fmt += f" {hora[:5]}h"
-
-                        # Rango de precio (no siempre esta disponible en Ticketmaster)
-                        precios = evento.get("priceRanges", [])
-                        precio_fmt = ""
-                        if precios:
-                            pmin = precios[0].get("min")
-                            pmax = precios[0].get("max")
-                            cur  = precios[0].get("currency", "EUR")
-                            if pmin is not None and pmax is not None and pmin != pmax:
-                                precio_fmt = f"{pmin:.0f}\u2013{pmax:.0f} {cur}"
-                            elif pmin is not None:
-                                precio_fmt = f"desde {pmin:.0f} {cur}"
-
-                        # Componer linea con los campos disponibles
-                        linea = f"- **{nombre}**"
-                        if fecha_fmt:
-                            linea += f" \u00b7 {fecha_fmt}"
-                        if precio_fmt:
-                            linea += f" \u00b7 \U0001f39f {precio_fmt}"
-                        if url_evento:
-                            # Añadir el nombre del evento al texto del botón para que se diferencien
-                            nombre_corto = nombre[:25] + "..." if len(nombre) > 25 else nombre
-                            linea += f" · [🎟 {enlace_texto} - {nombre_corto}]({url_evento})"
+                    
+                    for evento in eventos:
+                        linea = f"- **{evento['nombre']}**"
+                        if evento.get('fecha_fmt'):
+                            linea += f" · {evento['fecha_fmt']}"
+                        if evento.get('precio_fmt'):
+                            linea += f" · 🎟 {evento['precio_fmt']}"
+                        if evento.get('url'):
+                            nombre_corto = evento['nombre'][:25] + "..." if len(evento['nombre']) > 25 else evento['nombre']
+                            linea += f" · [🎟 {enlace_texto} - {nombre_corto}]({evento['url']})"
                         respuesta += linea + "\n"
-                            
+                        
                     dispatcher.utter_message(text=respuesta)
                 else:
                     dispatcher.utter_message(text=TEXTOS["action_buscar_eventos"]["respuestas"][idioma]["resultado_vacio"].format(ciudad=ciudad.capitalize()))
             else:
                 dispatcher.utter_message(text=TEXTOS["action_buscar_eventos"]["respuestas"][idioma]["error_api"])
-                print(f"Error Ticketmaster API: {response.status_code} - {response.text}")
-                guardar_error("Ticketmaster", f"Error API status {response.status_code}", response.text)
                 
         except Exception as e:
             dispatcher.utter_message(text=TEXTOS["action_buscar_eventos"]["respuestas"][idioma]["error_conexion"])
-            print("Error Exception Ticketmaster:", e)
-            guardar_error("Ticketmaster", "Excepcion al buscar eventos", e)
+            print("Error Exception Eventos:", e)
+            guardar_error("Ticketmaster", "Excepcion al procesar eventos en actions", e)
 
         return [SlotSet("ciudad", ciudad), SlotSet("tipo_busqueda", "eventos")]
 
