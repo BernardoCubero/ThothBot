@@ -20,3 +20,13 @@ def guardar_log(intent, ciudad, mensaje):
 
     coleccion.insert_one(log)
 
+coleccion_errores = db["errores"]
+
+def guardar_error(modulo, descripcion, detalles=None):
+    error_log = {
+        "timestamp": datetime.now(),
+        "modulo": modulo,
+        "descripcion": str(descripcion),
+        "detalles": str(detalles) if detalles else None
+    }
+    coleccion_errores.insert_one(error_log)

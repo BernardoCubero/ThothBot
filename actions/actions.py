@@ -1,6 +1,6 @@
 import unicodedata
 from rasa_sdk.events import FollowupAction
-from actions.db.mongo_logger import guardar_log
+from actions.db.mongo_logger import guardar_log, guardar_error
 from rasa_sdk import Action
 from rasa_sdk.events import SlotSet
 from difflib import get_close_matches
@@ -137,6 +137,7 @@ def buscar_en_wikipedia(monumento, idioma="es"):
         response = requests.get(url, params=params, headers=headers, timeout=4)
     except requests.RequestException as e:
         print("ERROR Wikipedia search:", e)
+        guardar_error("Wikipedia Search", "Error de red al buscar en Wikipedia", e)
         return None
 
     if response.status_code != 200:
@@ -195,6 +196,7 @@ def obtener_resumen_wikipedia(titulo, idioma="es", idioma_ui=None):
         terminos_disambig = ["desambiguación", "disambiguation", "wikimedia disambiguation"]
         if tipo_pagina == "disambiguation" or any(t in descripcion.lower() for t in terminos_disambig):
             print(f"[Wikipedia] Rechazada página de desambiguación: '{data.get('title', titulo)}'")
+            guardar_error("Wikipedia Summary", "Pagina de desambiguacion rechazada", data.get('title', titulo))
             return None
 
         extract = data.get("extract", "")
@@ -230,6 +232,7 @@ def obtener_resumen_wikipedia(titulo, idioma="es", idioma_ui=None):
     except Exception as e:
         # TODO: Mejorar este print porque a veces sale en consola y asusta
         print("ERROR Wikipedia summary:", e)
+        guardar_error("Wikipedia Summary", "Error al obtener resumen REST", e)
         return None
 
 
@@ -356,6 +359,7 @@ class ActionBuscarMonumentos(Action):
             guardar_log(intent, ciudad, mensaje)
         except Exception as e:
             print("Error log:", e)
+            guardar_error("Mongo Logger", "Error al guardar log de uso", e)
 
         #  si no hay ciudad
         if not ciudad:
@@ -500,6 +504,7 @@ class ActionBuscarMonumentos(Action):
         except Exception as e:
             dispatcher.utter_message(text=TEXTOS["action_buscar_monumentos"]["respuestas"][idioma]["error_api"])
             print(f"[ERROR ActionBuscarMonumentos] tipo={type(e).__name__} detalle={e}")
+            guardar_error("ActionBuscarMonumentos", "Error en la busqueda de monumentos Geoapify", e)
 
         return [SlotSet("ciudad", ciudad), SlotSet("tipo_busqueda", "monumentos")]
 
@@ -639,10 +644,12 @@ class ActionBuscarEventos(Action):
             else:
                 dispatcher.utter_message(text=TEXTOS["action_buscar_eventos"]["respuestas"][idioma]["error_api"])
                 print(f"Error Ticketmaster API: {response.status_code} - {response.text}")
+                guardar_error("Ticketmaster", f"Error API status {response.status_code}", response.text)
                 
         except Exception as e:
             dispatcher.utter_message(text=TEXTOS["action_buscar_eventos"]["respuestas"][idioma]["error_conexion"])
             print("Error Exception Ticketmaster:", e)
+            guardar_error("Ticketmaster", "Excepcion al buscar eventos", e)
 
         return [SlotSet("ciudad", ciudad), SlotSet("tipo_busqueda", "eventos")]
 
