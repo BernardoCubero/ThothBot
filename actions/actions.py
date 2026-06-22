@@ -13,7 +13,8 @@ from actions.utils.i18n import TEXTOS
 from actions.utils.text_utils import es_solo_numeros, ciudadNormalizada, corregir_typos_ciudad, detectar_idioma
 from actions.utils.rasa_utils import extraer_ciudad_del_mensaje
 
-from actions.services.api_geoapify import obtener_coords, buscar_lugares_cercanos\nfrom actions.services.api_ticketmaster import buscar_eventos
+from actions.services.api_geoapify import obtener_coords, buscar_lugares_cercanos
+from actions.services.api_ticketmaster import buscar_eventos
 from actions.services.api_wikipedia import buscar_en_wikipedia, obtener_resumen_wikipedia, tiene_info_wikipedia
 from actions.services.api_translation import traducir_es_en
 
@@ -123,7 +124,7 @@ class ActionBuscarMonumentos(Action):
             return []
 
         # llamada a Geoapify
-                try:
+        try:
             lugares = buscar_lugares_cercanos(lat, lon)
 
             if lugares:
@@ -209,7 +210,7 @@ class ActionBuscarEventos(Action):
         elif "deporte" in mensaje or "partido" in mensaje:
             classification = "Sports"
 
-                try:
+        try:
             eventos = buscar_eventos(ciudad, classification)
             if eventos is not None:
                 if eventos:
